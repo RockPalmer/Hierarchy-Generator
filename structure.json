@@ -13,62 +13,55 @@
       "projection" : {
         "directional" : false,
         "parameter" : "STRING{>0}",
-        "arity" : 1
+        "input" : "TYPE"
       },
       "selection" : {
         "directional" : false,
         "parameter" : "(INSTANCE) => BOOLEAN",
-        "arity" : 1
+        "input" : "TYPE"
       },
       "rename" : {
         "directional" : false,
         "parameter" : "MAPPING[STRING,STRING]{>0}",
-        "arity" : 1
+        "input" : "TYPE"
       },
       "alias" : {
         "directional" : false,
         "parameter" : "STRING",
-        "arity" : 1
+        "input" : "TYPE"
       },
       "union" : {
         "directional" : false,
-        "arity" : {
-          "min" : 2
-        }
+        "input" : "TYPE..."
       },
       "intersection" : {
         "directional" : false,
-        "arity" : {
-          "min" : 2
-        }
+        "input" : "TYPE..."
       },
       "symmetric difference" : {
         "directional" : false,
-        "arity" : {
-          "min" : 2
-        }
+        "input" : "TYPE..."
       },
       "difference" : {
         "directional" : true,
-        "arity" : {
-          "min" : 2
-        }
+        "input" : "TYPE..."
       },
       "product" : {
         "directional" : true,
-        "arity" : {
-          "min" : 2
-        }
+        "input" : "TYPE..."
       }
     },
     "relationship" : {
       "inheritance" : {
         "directional" : true,
-        "arity" : 2
+        "input" : [
+          "TYPE",
+          "TYPE"
+        ]
       },
       "instance" : {
         "directional" : true,
-        "arity" : [
+        "input" : [
           "ATTRIBUTE",
           "TYPE"
         ]
