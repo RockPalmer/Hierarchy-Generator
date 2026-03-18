@@ -1,66 +1,17 @@
-ENTITIES : set[tuple[int,str,str]] # ENTITY_ID,TYPE,NAME
-PROJECTIONS : set[tuple[int,index,str,int]] # PROJECTION_ID,INDEX,ATTRIBUTE_NAME,ENTITY_ID
-SELECTIONS : set[tuple[int,int,int]] # SELECTION_ID,CONDITION_ID,ENTITY_ID
-RENAMES : dict[tuple[int,str,str,int,int]] # RENAME_ID,PREVIOUS_ATTRIBUTE_NAME,NEW_ATTRIBUTE_NAME,INDEX,ENTITY_ID
-ALIASES : 
-
-{
-  "function" : {
-    "projection" : {
-      "directional" : false,
-      "parameter" : "STRING{>0}",
-      "input" : "TYPE"
-    },
-    "selection" : {
-      "directional" : false,
-      "parameter" : "(INSTANCE) => BOOLEAN",
-      "input" : "TYPE"
-    },
-    "rename" : {
-      "directional" : false,
-      "parameter" : "MAPPING[STRING,STRING]{>0}",
-      "input" : "TYPE"
-    },
-    "alias" : {
-      "directional" : false,
-      "parameter" : "STRING",
-      "input" : "TYPE"
-    },
-    "union" : {
-      "directional" : false,
-      "input" : "TYPE..."
-    },
-    "intersection" : {
-      "directional" : false,
-      "input" : "TYPE..."
-    },
-    "symmetric difference" : {
-      "directional" : false,
-      "input" : "TYPE..."
-    },
-    "difference" : {
-      "directional" : true,
-      "input" : "TYPE..."
-    },
-    "product" : {
-      "directional" : true,
-      "input" : "TYPE..."
-    }
-  },
-  "relationship" : {
-    "inheritance" : {
-      "directional" : true,
-      "input" : [
-        "TYPE",
-        "TYPE"
-      ]
-    },
-    "instance" : {
-      "directional" : true,
-      "input" : [
-        "ATTRIBUTE",
-        "TYPE"
-      ]
-    }
-  }
+ATTRIBUTES : int,int,str                        # TYPE_ID,INDEX,ATTRIBUTE_NAME
+INHERITANCES : int,int                          # CHILD_TYPE_ID,PARENT_TYPE_ID
+INSTANCES : int,int,int                         # CHILD_TYPE_ID,ATTRIBUTE_INDEX,PARENT_TYPE_ID
+TYPES : {
+  (int,'LITERAL',str),                          # TYPE_NAME
+  (int,'PROJECTION',int),                       # TYPE_ID
+  (int,'SELECTION',int,int),                    # CONDITION_ID,TYPE_ID
+  (int,'RENAME',int),                           # TYPE_ID
+  (int,'ALIAS',str,int),                        # NEW_TYPE_NAME,TYPE_ID
+  (int,'UNION',frozenset[int]),                 # frozenset[TYPE_ID]
+  (int,'INTERSECTION',frozenset[int]),          # frozenset[TYPE_ID]
+  (int,'SYMMETRIC_DIFFERENCE',frozenset[int]),  # frozenset[TYPE_ID]
+  (int,'DIFFERENCE',int,...),                   # TYPE_ID...
+  (int,'PRODUCT',int,...),                      # TYPE_ID...
 }
+PROJECTIONS : int,int,int,int                   # PROJECTION_ID,NEW_COLUMN_INDEX,ATTRIBUTE_INDEX
+RENAMES : int,str,int                           # RENAME_ID,NEW_ATTRIBUTE_NAME,ATTRIBUTE_INDEX
