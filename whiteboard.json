@@ -2,7 +2,7 @@
   "entity" : {
     "TYPE" : {
       "name" : "STRING",
-      "attributes" : "SET[ATTRIBUTE]"
+      "attributes?" : "SET[ATTRIBUTE]"
     },
     "ATTRIBUTE" : {
       "name" : "STRING",
