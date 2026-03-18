@@ -1,0 +1,84 @@
+{
+  "entity" : {
+    "TYPE" : {
+      "name" : "STRING",
+      "attributes?" : "SET[ATTRIBUTE]"
+    },
+    "ATTRIBUTE" : {
+      "name" : "STRING",
+      "type?" : "TYPE",
+      "arguments?" : "ARGUMENT_LIST"
+    },
+    "ARGUMENT_LIST" : {
+      "positional_delimiter" : "INTEGER",
+      "list_argument_index?" : "INTEGER",
+      "dict_argument_index?" : "INTEGER",
+      "arguments" : "LIST[ARGUMENT]"
+    },
+    "ARGUMENT" : {
+      "name" : "STRING",
+      "type" : "TYPE",
+      "default" : "SCALAR"
+    }
+  },
+  "operator" : {
+    "function" : {
+      "projection" : {
+        "directional" : false,
+        "parameter" : "STRING{>0}",
+        "arity" : 1
+      },
+      "selection" : {
+        "directional" : false,
+        "parameter" : "(INSTANCE) => BOOLEAN",
+        "arity" : 1
+      },
+      "rename" : {
+        "directional" : false,
+        "parameter" : "MAPPING[STRING,STRING]{>0}",
+        "arity" : 1
+      },
+      "alias" : {
+        "directional" : false,
+        "parameter" : "STRING",
+        "arity" : 1
+      },
+      "union" : {
+        "directional" : false,
+        "arity" : {
+          "min" : 2
+        }
+      },
+      "intersection" : {
+        "directional" : false,
+        "arity" : {
+          "min" : 2
+        }
+      },
+      "symmetric difference" : {
+        "directional" : false,
+        "arity" : {
+          "min" : 2
+        }
+      },
+      "difference" : {
+        "directional" : true,
+        "arity" : {
+          "min" : 2
+        }
+      },
+      "product" : {
+        "directional" : true,
+        "arity" : {
+          "min" : 2
+        }
+      }
+    },
+    "relationship" : {
+      "inheritance" : {
+        "directional" : true,
+        "arity" : 2
+      }
+    }
+  }
+}
