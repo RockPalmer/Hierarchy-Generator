@@ -10,8 +10,21 @@
       "arguments" : "LIST[ARGUMENT]"
     },
     "ARGUMENT" : {
-      "name" : "STRING",
-      "type" : "TYPE"
+      "name" : "STRING"
+    }
+  },
+  "operators" : {
+    "relationships" : {
+      "instance" : {
+        "directional" : true,
+        "inputs" : [
+          "TYPE",
+          [
+            "ATTRIBUTE",
+            "ARGUMENT"
+          ]
+        ]
+      }
     }
   }
 }
