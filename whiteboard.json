@@ -6,8 +6,7 @@
     },
     "ATTRIBUTE" : {
       "name" : "STRING",
-      "type" : "TYPE?",
-      "arguments" : "LIST[ARGUMENT]?"
+      "type?" : "TYPE"
     }
   },
   "operator" : {
