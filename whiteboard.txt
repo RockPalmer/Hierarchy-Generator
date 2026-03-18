@@ -1,0 +1,25 @@
+{
+  "type" : {
+    "TYPE" : {
+      "name" : "STRING",
+      "attributes" : "SET[ATTRIBUTE]"
+    },
+    "ATTRIBUTE" : {
+      "name" : "STRING",
+      "type" : "TYPE?",
+      "arguments" : "LIST[ARGUMENT]?"
+    }
+  },
+  "operator" : {
+    "projection" : [
+      
+    ],
+    "selection" : {},
+    "rename" : {},
+    "equality" : {},
+    "inheritance" : {},
+    "union" : {},
+    "intersection" : {},
+    "join" : {}
+  }
+}
