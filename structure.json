@@ -5,8 +5,7 @@
       "attributes?" : "SET[ATTRIBUTE]"
     },
     "ATTRIBUTE" : {
-      "name" : "STRING",
-      "type?" : "TYPE"
+      "name" : "STRING"
     }
   },
   "operator" : {
@@ -66,6 +65,13 @@
       "inheritance" : {
         "directional" : true,
         "arity" : 2
+      },
+      "instance" : {
+        "directional" : true,
+        "arity" : [
+          "ATTRIBUTE",
+          "TYPE"
+        ]
       }
     }
   }
