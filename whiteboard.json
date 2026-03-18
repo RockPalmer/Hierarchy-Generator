@@ -1,5 +1,5 @@
 {
-  "type" : {
+  "entity" : {
     "TYPE" : {
       "name" : "STRING",
       "attributes" : "SET[ATTRIBUTE]"
@@ -11,15 +11,50 @@
     }
   },
   "operator" : {
-    "projection" : [
-      
-    ],
-    "selection" : {},
-    "rename" : {},
-    "equality" : {},
-    "inheritance" : {},
-    "union" : {},
-    "intersection" : {},
-    "join" : {}
+    "function" : {
+      "projection" : {
+        "parameter" : "STRING{>0}",
+        "inputs" : 1
+      },
+      "selection" : {
+        "parameter" : "(INSTANCE) => BOOLEAN",
+        "inputs" : 1
+      },
+      "rename" : {
+        "parameter" : "MAPPING[STRING,STRING]{>0}",
+        "inputs" : 1
+      },
+      "alias" : {
+        "parameter" : "STRING",
+        "inputs" : 1
+      },
+      "union" : {
+        "inputs" : {
+          "min" : 2
+        }
+      },
+      "intersection" : {
+        "inputs" : {
+          "min" : 2
+        }
+      },
+      "symmetric difference" : {
+        "inputs" : {
+          "min" : 2
+        }
+      },
+      "difference" : {
+        "inputs" : 2
+      },
+      "product" : {
+        "inputs" : {
+          "min" : 2
+        }
+      }
+    },
+    "inheritance" : [
+      "TYPE",
+      "TYPE"
+    ]
   }
 }
