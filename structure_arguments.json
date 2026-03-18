@@ -17,8 +17,7 @@
     },
     "ARGUMENT" : {
       "name" : "STRING",
-      "type" : "TYPE",
-      "default" : "SCALAR"
+      "type" : "TYPE"
     }
   },
   "operator" : {
