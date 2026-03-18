@@ -1,1 +1,15 @@
-
+{
+  "entity" : {
+    "SCALAR" : {
+      "name" : "STRING"
+    }
+  },
+  "operators" : {
+    "relationship" : {
+      "instance" : {
+        "directional" : true,
+        "arity" : 2
+      }
+    }
+  }
+}
