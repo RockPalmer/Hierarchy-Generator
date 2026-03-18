@@ -13,48 +13,61 @@
   "operator" : {
     "function" : {
       "projection" : {
+        "directional" : false,
         "parameter" : "STRING{>0}",
-        "inputs" : 1
+        "arity" : 1
       },
       "selection" : {
+        "directional" : false,
         "parameter" : "(INSTANCE) => BOOLEAN",
-        "inputs" : 1
+        "arity" : 1
       },
       "rename" : {
+        "directional" : false,
         "parameter" : "MAPPING[STRING,STRING]{>0}",
-        "inputs" : 1
+        "arity" : 1
       },
       "alias" : {
+        "directional" : false,
         "parameter" : "STRING",
-        "inputs" : 1
+        "arity" : 1
       },
       "union" : {
-        "inputs" : {
+        "directional" : false,
+        "arity" : {
           "min" : 2
         }
       },
       "intersection" : {
-        "inputs" : {
+        "directional" : false,
+        "arity" : {
           "min" : 2
         }
       },
       "symmetric difference" : {
-        "inputs" : {
+        "directional" : false,
+        "arity" : {
           "min" : 2
         }
       },
       "difference" : {
-        "inputs" : 2
+        "directional" : true,
+        "arity" : {
+          "min" : 2
+        }
       },
       "product" : {
-        "inputs" : {
+        "directional" : true,
+        "arity" : {
           "min" : 2
         }
       }
     },
-    "inheritance" : [
-      "TYPE",
-      "TYPE"
-    ]
+    "relationship" : {
+      "inheritance" : {
+        "directional" : true,
+        "arity" : 2
+      }
+    }
   }
 }
