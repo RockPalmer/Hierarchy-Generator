@@ -18,11 +18,11 @@
       "instance" : {
         "directional" : true,
         "inputs" : [
-          "TYPE",
           [
             "ATTRIBUTE",
             "ARGUMENT"
-          ]
+          ],
+          "TYPE"
         ]
       }
     }
