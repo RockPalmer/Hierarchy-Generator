@@ -40,9 +40,23 @@ class GridSpace:
 		self.element_id = 0
 		self.root = root
 		self.root.title("Grid Space")
-		self.tooltip = self.create_tooltip()
+		self.tooltip = tk.Menu(
+			self.root,
+			tearoff = 0,
+		)
+		self.tooltip.add_command(
+			label = 'Add',
+		)
+		self.tooltip.add_command(
+			label = 'Edit',
+		)
+		self.tooltip.add_command(
+			label = 'Delete',
+		)
 		self.canvas = create_gridded_canvas(self.root,self.grid_size)
-		self.attributes = {}
+		self.attributes = {
+			'entries' : {}
+		}
 
 		# left click down event
 		self.canvas.bind(
@@ -59,13 +73,19 @@ class GridSpace:
 			'<B1-Motion>',
 			self.left_click_move,
 		)
+		# double left click event
+		self.canvas.bind(
+			'<Double-Button-1>',
+			self.double_left_click,
+		)
+		# move mouse
 		self.canvas.bind(
 			'<Motion>',
 			self.mouse_move,
 		)
 		# right click up event
 		self.canvas.bind(
-			'<ButtonPress-3>',
+			'<ButtonRelease-3>',
 			self.right_click_up,
 		)
 		self.create_rectangle(
@@ -96,32 +116,6 @@ class GridSpace:
 		return {
 			tag for tag in self.canvas.gettags(eid) if '=' not in tag
 		}
-	def create_tooltip(self):
-		tooltip = tk.Menu(
-			self.root,
-			tearoff = 0,
-		)
-		add_tooltip = tk.Menu(
-			tooltip,
-			tearoff = 0,
-		)
-		add_tooltip.add_command(
-			label = "Block",
-		)
-		add_tooltip.add_command(
-			label = "Line",
-		)
-		tooltip.add_cascade(
-			menu = add_tooltip,
-			label = 'Add',
-		)
-		tooltip.add_command(
-			label = 'Edit',
-		)
-		tooltip.add_command(
-			label = 'Delete',
-		)
-		return tooltip
 	def get_children(self,eid : int) -> set[int]:
 		return set(
 			self.canvas.find_withtag('parent=' + str(eid))
@@ -267,25 +261,71 @@ class GridSpace:
 				event.x,
 				event.y,
 				event.x,
-				event.y
+				event.y,
 			)
 		)
-		tags = set()
+		elements = set()
 		for eid in overlapping:
 			attrs = self.get_attributes(eid)
+			if 'type' not in attrs:
+				continue
 			if 'parent' in attrs:
-				tags |= set(self.canvas.gettags(attrs['parent']))
+				atr = self.get_attributes(attrs['parent'])
+				if 'type' in atr and atr['type'] == 'element':
+					elements.add(attrs['parent'])
 			elif attrs['type'] == 'element':
-				tags |= set(self.canvas.gettags(eid))
+				elements.add(eid)
+		self.tooltip.delete(0)
+		add_tooltip = tk.Menu(
+			self.tooltip,
+			tearoff = 0,
+		)
 		if len(overlapping) == 0:
-			self.tooltip.entryconfigure(
-				'Edit',
-				state = 'disabled'
+			add_tooltip.add_command(
+				label = 'Block',
 			)
-		else:
+			add_tooltip.add_command(
+				label = 'Line',
+			)
+			self.tooltip.insert_cascade(
+				0,
+				label = 'Add',
+				state = 'normal',
+				menu = add_tooltip
+			)
 			self.tooltip.entryconfigure(
 				'Edit',
-				state = 'normal'
+				state = 'disabled',
+			)
+			self.tooltip.entryconfigure(
+				'Delete',
+				state = 'disabled',
+			)
+			print('empty')
+		else:
+			eid = list(elements)[0]
+			attrs = self.get_attributes(eid)
+			match attrs['element_type']:
+				case 'block':
+					print('block')
+					add_tooltip.add_command(
+						label = 'Attribute',
+					)
+				case _:
+					raise TypeError('Invalid element_type: ' + str(attrs['element_type']))
+			self.tooltip.insert_cascade(
+				0,
+				label = 'Add',
+				state = 'normal',
+				menu = add_tooltip
+			)
+			self.tooltip.entryconfigure(
+				'Edit',
+				state = 'normal',
+			)
+			self.tooltip.entryconfigure(
+				'Delete',
+				state = 'normal',
 			)
 		self.tooltip.tk_popup(
 			event.x_root - 10,
@@ -632,6 +672,51 @@ class GridSpace:
 			self.canvas.dtag('selected=true','selected=true')
 			del self.attributes['selected_element_cursor_source']
 			del self.attributes['selected_element_source_coords']
+	def double_left_click(self,event):
+		elements = set(
+			self.canvas.find_overlapping(
+				event.x,
+				event.y,
+				event.x,
+				event.y,
+			)
+		)
+		eid = None
+		for element in elements:
+			attrs = self.get_attributes(element)
+			if 'type' in attrs and attrs['type'] == 'text':
+				eid = element
+				break
+		if eid is not None:
+			parent = attrs['parent']
+			text = self.canvas.itemcget(eid,'text')
+			xlen = None
+			match self.canvas.type(parent):
+				case 'rectangle':
+					(x1,y1,x2,y2) = self.canvas.coords(parent)
+					xlen = x2 - x1
+				case _:
+					raise TypeError('Invalid canvas type: ' + str(self.canvas.type(parent)))
+			coords = self.canvas.coords(eid)
+			self.canvas.delete(eid)
+			entry_box = tk.Entry(
+				self.root,
+				text = text,
+				width = round(xlen // 3),
+			)
+			canvas_window = self.canvas.create_window(
+				coords[0],
+				coords[1],
+				window = entry_box,
+				tags = ('type="entry"','parent=' + str(parent)),
+				width = round(xlen // 3),
+			)
+			entry_box.insert(0,text)
+			entry_box.bind(
+				'<Return>',
+				self.finish_entry,
+			)
+			self.attributes['entries'][canvas_window] = entry_box
 	def enter_element(self,event):
 		self.canvas.config(cursor = 'fleur')
 
@@ -756,3 +841,29 @@ class GridSpace:
 				fill = '',
 				outline = '',
 			)
+	def finish_entry(self,event):
+		wid = None
+		for window,entry in self.attributes['entries'].items():
+			if str(entry) == str(event.widget):
+				wid = window
+				break
+		if wid is None:
+			raise TypeError('No window found for entry')
+		text = event.widget.get()
+		coords = self.canvas.coords(wid)
+		attrs = self.get_attributes(wid)
+		parent = attrs['parent']
+		match self.canvas.type(parent):
+			case 'rectangle':
+				(x1,x2,y1,y2) = self.canvas.coords(parent)
+				xlen = x2 - x1
+			case _:
+				raise TypeError
+		event.widget.destroy()
+		self.canvas.delete(wid)
+		self.canvas.create_text(
+			coords[0],
+			coords[1],
+			text = text,
+			tags = ('type="text"','parent=' + str(parent)),
+		)
