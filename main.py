@@ -1,11 +1,12 @@
 import tkinter as tk
+from gridspace import *
 
-class GridHighlightApp:
+class GridBlob:
     def __init__(self,root) -> None:
-        self.card_size = 20
+        self.grid_size = 20
         self.element_id = 0
         self.root = root
-        self.root.title("Grid Hover Highlight")
+        self.root.title("Grid Space")
         self.tooltip = tk.Menu(
             self.root,
             tearoff = 0
@@ -24,12 +25,17 @@ class GridHighlightApp:
             root,
             width = self.root.winfo_screenwidth(),
             height = self.root.winfo_screenheight(),
-            scrollregion = (0,0,self.root.winfo_screenwidth(),self.root.winfo_screenheight()),
+            scrollregion = (
+                0,
+                0,
+                self.root.winfo_screenwidth(),
+                self.root.winfo_screenheight()
+            ),
             bg = "#c7c7c7"
         )
         self.canvas.pack()
 
-        for x in range(0, self.root.winfo_screenwidth(), self.card_size):
+        for x in range(0, self.root.winfo_screenwidth(), self.grid_size):
             self.canvas.create_line(
                 x,
                 0,
@@ -38,7 +44,7 @@ class GridHighlightApp:
                 fill = "#ddd"
             )
 
-        for y in range(0, self.root.winfo_screenheight(), self.card_size):
+        for y in range(0, self.root.winfo_screenheight(), self.grid_size):
             self.canvas.create_line(
                 0,
                 y,
@@ -71,8 +77,8 @@ class GridHighlightApp:
             'element' : self.canvas.create_rectangle(
                 x,
                 y,
-                x + self.card_size,
-                y + self.card_size,
+                x + self.grid_size,
+                y + self.grid_size,
                 **attributes
             )
         }
@@ -85,8 +91,8 @@ class GridHighlightApp:
         self.tooltip.focus_set()
     def get_grid_cell(self,event) -> tuple[int,int]:
         return (
-            (event.x // self.card_size) * self.card_size,
-            (event.y // self.card_size) * self.card_size
+            (event.x // self.grid_size) * self.grid_size,
+            (event.y // self.grid_size) * self.grid_size
         )
     def select_element(self,event):
         (x,y) = self.get_grid_cell(event)
@@ -100,8 +106,8 @@ class GridHighlightApp:
                 self.elements[self.current_element_id],
                 x,
                 y,
-                x + self.card_size,
-                y + self.card_size
+                x + self.grid_size,
+                y + self.grid_size
             )
             self.elements[self.current_element_id]['coords'] = (x,y)
             self.canvas.itemconfigure(
@@ -119,8 +125,8 @@ class GridHighlightApp:
                 self.highlight_square = self.canvas.create_rectangle(
                     x,
                     y,
-                    x + self.card_size,
-                    y + self.card_size,
+                    x + self.grid_size,
+                    y + self.grid_size,
                     fill = '#8b8b8b',
                     outline = ''
                 )
@@ -129,8 +135,8 @@ class GridHighlightApp:
                     self.highlight_square,
                     x,
                     y,
-                    x + self.card_size,
-                    y + self.card_size
+                    x + self.grid_size,
+                    y + self.grid_size
                 )
     def try_create_square(self,event):
         (x,y) = self.get_grid_cell(event)
@@ -139,13 +145,13 @@ class GridHighlightApp:
             self.elements[x,y] = self.canvas.create_rectangle(
                 x,
                 y,
-                x + self.card_size,
-                y + self.card_size,
+                x + self.grid_size,
+                y + self.grid_size,
                 fill = "white",
                 outline = "black"
             )
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = GridHighlightApp(root)
+    app = GridSpace(root,20)
     root.mainloop()
