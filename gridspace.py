@@ -52,11 +52,7 @@ def TAG_(arg):
 def TAGS_(**args):
 	vals = []
 	for k,v in args.items():
-		if isinstance(v,set):
-			for u in v:
-				vals.append(str(k) + '_eq_' + str(u))
-		else:
-			vals.append(str(k) + '_eq_' + str(v))
+		vals.append(str(k) + '_eq_' + str(v))
 	return tuple(vals)
 def VALUE_(value : str) -> str | bool | int | float:
 	if value == 'True':
@@ -105,6 +101,8 @@ def create_gridded_canvas(root,grid_size : int):
 hierarchies = {
 	'hover' : [
 		'element',
+		'line',
+		'head',
 		'outline',
 		'border',
 		'divider',
@@ -113,6 +111,8 @@ hierarchies = {
 	'left-click' : [
 		'text',
 		'element',
+		'line',
+		'head',
 		'outline',
 		'border',
 		'divider',
@@ -120,6 +120,8 @@ hierarchies = {
 	'right-click' : [
 		'text',
 		'element',
+		'line',
+		'head',
 		'outline',
 		'border',
 		'divider',
@@ -178,14 +180,8 @@ class GridSpace:
 		self.attr_height = self.win_height // 16
 		self.type_border_thickness = 10
 		self.attribute_border_thickness = 5
-		self.create_type(
-			self.type_width * 3, # 40
-			self.type_height * 3, # 40
-		)
-		self.create_type(
-			self.type_width * 6, # 80
-			self.type_height * 6, # 80
-		)
+		self.arrow_height = self.grid_size * 2
+		self.arrow_base = self.grid_size
 	def find(self,value):
 		return self.canvas.find_withtag(TAG_(value))
 	def event_hierarchy(self,event_type : str,*eids : tuple[int,...]):
@@ -195,17 +191,32 @@ class GridSpace:
 		for eid in eids:
 			attrs = self.get_attributes(eid)
 			if 'type' in attrs:
-				if not isinstance(attrs['type'],set):
-					attrs['type'] = {attrs['type']}
-				vals = [hierarchies[event_type].index(t) for t in attrs['type'] if t in hierarchies[event_type]]
-				if len(vals) > 0:
-					obj_types[eid] = max(vals)
+				obj_types[eid] = hierarchies[event_type].index(attrs['type'])
 		if len(obj_types) == 0:
 			return None
 		max_val = max(obj_types.values())
 		for eid,h in obj_types.items():
 			if h == max_val:
 				return eid
+	def get_bounds(self,eid : int) -> tuple[int,int,int,int]:
+		(x1,y1,x2,y2) = self.canvas.coords(eid)
+		attributes = self.find(
+			AND_(
+				('type','element'),
+				('container',eid)
+			)
+		)
+		if len(attributes) > 0:
+			last_attribute = self.find(
+				AND_(
+					('type','element'),
+					('container',eid),
+					('index',len(attributes) - 1)
+				)
+			)[0]
+			(ax1,ay1,ax2,ay2) = self.canvas.coords(last_attribute)
+			return (x1,y1,ax2,ay2)
+		return (x1,y1,x2,y2)
 	def handle_hover(self,x : int,y : int,top : bool,*eids : tuple[int,...]):
 		match len(eids):
 			case 1:
@@ -214,358 +225,781 @@ class GridSpace:
 				eid = None
 			case _:
 				eid = self.event_hierarchy('hover',*eids)
-		for border in self.find(OR_(
-			('type','border'),
-			('type','outline'),
-			('type','divider')
-		)):
-			self.canvas.itemconfigure(
-				border,
-				fill = '',
-				outline = '',
-			)
-		if eid is not None:
-			attrs = self.get_attributes(eid)
-			if 'type' in attrs:
-				if 'text' in attrs['type']:
-					if top:
-						self.canvas.config(cursor = 'xterm')
-					self.handle_hover(x,y,False,attrs['parent'])
-				elif 'border' in attrs['type']:
-					if top:
-						if 'edge' in attrs['type']:
-							if 'left' in attrs['type']:
-								self.canvas.config(cursor = 'left_side')
-							elif 'right' in attrs['type']:
-								self.canvas.config(cursor = 'right_side')
-							elif 'top' in attrs['type']:
-								self.canvas.config(cursor = 'top_side')
-							elif 'bottom' in attrs['type']:
-								self.canvas.config(cursor = 'bottom_side')
-							else:
-								raise TypeError('Invalid type: ' + str(attrs['type']))
-						elif 'corner' in attrs['type']:
-							if attrs['top']:
-								if attrs['left']:
-									self.canvas.config(cursor = 'top_left_corner')
-								else:
-									self.canvas.config(cursor = 'top_right_corner')
-							else:
-								if attrs['left']:
-									self.canvas.config(cursor = 'bottom_left_corner')
-								else:
-									self.canvas.config(cursor = 'bottom_right_corner')
-						else:
-							raise TypeError('Invalid border_type: ' + str(attrs['border_type']))
-					self.handle_hover(x,y,False,attrs['parent'])
-				elif 'outline' in attrs['type']:
-					self.handle_hover(x,y,top,attrs['parent'])
-				elif 'element' in attrs['type']:
-					if top:
-						self.canvas.config(cursor = 'fleur')
-					for border in self.find(
-						AND_(
-							OR_(
-								('type','border'),
-								('type','outline')
-							),
-							('parent',eid)
-						)
-					):
-						attrs = self.get_attributes(border)
-						if 'border' in attrs['type']:
-							if 'edge' in attrs['type']:
-								self.canvas.itemconfigure(
-									border,
-									outline = 'black',
-									fill = 'yellow'
-								)
-							elif 'corner' in attrs['type']:
-								self.canvas.itemconfigure(
-									border,
-									outline = 'black',
-									fill = 'white'
-								)
-							else:
-								raise TypeError('Invalid type: ' + str(attrs['type']))
-						elif 'outline' in attrs['type']:
-							self.canvas.itemconfigure(
-								border,
-								outline = 'black',
-								fill = 'black'
-							)
-						else:
-							raise TypeError('Ivalid type: ' + str(attrs['type']))
-				elif 'divider' in attrs['type']:
-					if top:
-						self.canvas.config(cursor = 'double_arrow')
-					self.canvas.itemconfigure(
-						eid,
-						outline = 'black',
-						fill = 'yellow',
-					)
-				else:
-					raise TypeError('Invalid type: ' + str(attrs['type']))
-			if top:
-				selected = self.find(('selected',True))
-				if len(selected) == 0:
+		if 'link_state' in self.attributes:
+			if 'link_start' not in self.attributes:
+				# Handle cursor
+				self.canvas.config(cursor = 'dot')
+				if eid is None:
 					return
-				val = selected[0]
-				(cx1,cy1) = self.attributes['selected_element_cursor_source']
-				(cx2,cy2) = (x,y)
-				grid_vector = self.get_grid_coords(cx2 - cx1,cy2 - cy1)
-				attrs = self.get_attributes(val)
-				(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
-				if 'type' in attrs['type']:
-					self.place_type(
-						val,
-						x1 + grid_vector[0],
-						y1 + grid_vector[1],
-						x2 + grid_vector[0],
-						y2 + grid_vector[1],
+
+				# Handle highlighting
+				for border in self.find(AND_(
+					OR_(
+						('type','border'),
+						('type','outline'),
 					)
-				elif 'border' in attrs['type']:
-					if 'edge' in attrs['type']:
-						if 'top' in attrs['type']:
-							self.place_type(
-								attrs['parent'],
-								x1,
-								y1 + grid_vector[1],
-								x2,
-								y2,
-							)
-						elif 'bottom' in attrs['type']:
-							self.place_type(
-								attrs['parent'],
-								x1,
-								y1,
-								x2,
-								y2 + grid_vector[1],
-							)
-						elif 'left' in attrs['type']:
-							self.place_type(
-								attrs['parent'],
-								x1 + grid_vector[0],
-								y1,
-								x2,
-								y2,
-							)
-						elif 'right' in attrs['type']:
-							self.place_type(
-								attrs['parent'],
-								x1,
-								y1,
-								x2 + grid_vector[0],
-								y2,
-							)
-						else:
-							raise TypeError('Invalid type: ' + str(attrs['type']))
-					elif 'corner' in attrs['type']:
-						if attrs['top']:
-							if attrs['left']:
-								self.place_type(
-									attrs['parent'],
-									x1 + grid_vector[0],
-									y1 + grid_vector[1],
-									x2,
-									y2,
-								)
-							else:
-								self.place_type(
-									attrs['parent'],
-									x1,
-									y1 + grid_vector[1],
-									x2 + grid_vector[0],
-									y2,
-								)
-						else:
-							if attrs['left']:
-								self.place_type(
-									attrs['parent'],
-									x1 + grid_vector[0],
-									y1,
-									x2,
-									y2 + grid_vector[1],
-								)
-							else:
-								self.place_type(
-									attrs['parent'],
-									x1,
-									y1,
-									x2 + grid_vector[0],
-									y2 + grid_vector[1],
-								)
+				)):
+					attrs = self.get_attributes(border)
+					if attrs.get('parent',None) == eid:
+						self.canvas.itemconfigure(
+							border,
+							fill = attrs['fill'],
+							outline = attrs['outline']
+						)
 					else:
-						raise TypeError('Invalid type: ' + str(attrs['type']))
-				elif 'divider' in attrs['type']:
-					(top,bottom) = (attrs['top'],attrs['bottom'])
-					self.place_attribute(
-						bottom,
-						x1,
-						y1 + grid_vector[1],
-						(y2 - y1) - grid_vector[1],
+						self.canvas.itemconfigure(
+							border,
+							fill = '',
+							outline = ''
+						)
+			elif 'link_end' not in self.attributes:
+				# Handle cursor
+				(x1,y1,x2,y2) = self.canvas.coords(self.attributes['link_start'])
+				if eid is None:
+					self.canvas.coords(
+						self.attributes['link_line'],
+						(x1 + x2) / 2,
+						(y1 + y2) / 2,
+						x,
+						y,
 					)
-					top_attrs = self.get_attributes(top)
-					if 'type' in top_attrs['type']:
+					return
+				(xa1,ya1,xa2,ya2) = self.canvas.coords(eid)
+				self.canvas.coords(
+					self.attributes['link_line'],
+					(x1 + x2) / 2,
+					(y1 + y2) / 2,
+					(xa1 + xa2) / 2,
+					(ya1 + ya2) / 2,
+				)
+
+				# Handle highlighting
+				for border in self.find(AND_(
+					OR_(
+						('type','border'),
+						('type','outline'),
+					)
+				)):
+					attrs = self.get_attributes(border)
+					if attrs.get('parent',None) == eid:
+						self.canvas.itemconfigure(
+							border,
+							fill = attrs['fill'],
+							outline = attrs['outline']
+						)
+					else:
+						self.canvas.itemconfigure(
+							border,
+							fill = '',
+							outline = ''
+						)
+		elif 'connected_start' in self.attributes:
+			# Handling connection
+
+			for border in self.find(AND_(
+				('type','border'),
+				('parent',self.attributes['connected_start'])
+			)):
+				attrs = self.get_attributes(border)
+				self.canvas.itemconfigure(
+					border,
+					fill = attrs['fill'],
+					outline = attrs['outline'],
+				)
+			# Handle cursor
+			self.canvas.config(cursor = 'dot')
+			# Get grid coordinates of cursor
+			(gx,gy) = self.get_grid_coords(x,y)
+			# Get attributes of connected element
+			attributes = self.get_attributes(self.attributes['connected_start'])
+			# Get type of connected element
+			type_val = self.get_type(attributes,2)
+			if ('element','type') != type_val:
+				raise TypeError('Invalid type: ' + str(type_val))
+			# Get grid coordinates of connected element
+			(x1,y1,x2,y2) = self.get_grid_coords(
+				*self.get_bounds(
+					self.attributes['connected_start']
+				)
+			)
+
+			# Get true coordinates of connected element and cursor
+			(x1,y1,x2,y2,gx,gy) = self.get_true_coords(x1,y1,x2,y2,gx,gy)
+			match self.attributes['connected_state']:
+				case 1: # Start connection
+					if gy > y1 and gy <= y2:
+						if gx < x1:
+							if 'temp_line' not in self.attributes:
+								self.attributes['temp_line'] = self.canvas.create_line(
+									x1,
+									gy - self.grid_size / 2,
+									gx,
+									gy - self.grid_size / 2,
+									dash = (3,3),
+									tags = TAGS_(
+										type = 'line',
+										sub_type = 'west',
+										start = self.attributes['connected_start'],
+									)
+								)
+							else:
+								self.canvas.coords(
+									self.attributes['temp_line'],
+									x1,
+									gy - self.grid_size / 2,
+									gx,
+									gy - self.grid_size / 2,
+								)
+						elif gx > x2:
+							if 'temp_line' not in self.attributes:
+								self.attributes['temp_line'] = self.canvas.create_line(
+									x2,
+									gy - self.grid_size / 2,
+									gx,
+									gy - self.grid_size / 2,
+									dash = (3,3),
+									tags = TAGS_(
+										type = 'line',
+										sub_type = 'east',
+										start = self.attributes['connected_start'],
+									)
+								)
+							else:
+								self.canvas.coords(
+									self.attributes['temp_line'],
+									x2,
+									gy - self.grid_size / 2,
+									gx,
+									gy - self.grid_size / 2,
+								)
+						elif 'temp_line' in self.attributes:
+							self.canvas.delete(self.attributes['temp_line'])
+							del self.attributes['temp_line']
+					elif gx > x1 and gx <= x2:
+						if gy < y1:
+							if 'temp_line' not in self.attributes:
+								self.attributes['temp_line'] = self.canvas.create_line(
+									gx - self.grid_size / 2,
+									y1,
+									gx - self.grid_size / 2,
+									gy,
+									dash = (3,3),
+									tags = TAGS_(
+										type = 'line',
+										sub_type = 'north',
+										start = self.attributes['connected_start'],
+									)
+								)
+							else:
+								self.canvas.coords(
+									self.attributes['temp_line'],
+									gx - self.grid_size / 2,
+									y1,
+									gx - self.grid_size / 2,
+									gy,
+								)
+						elif gy > y2:
+							if 'temp_line' not in self.attributes:
+								self.attributes['temp_line'] = self.canvas.create_line(
+									gx - self.grid_size / 2,
+									y2,
+									gx - self.grid_size / 2,
+									gy,
+									dash = (3,3),
+									tags = TAGS_(
+										type = 'line',
+										sub_type = 'south',
+										start = self.attributes['connected_start'],
+									)
+								)
+							else:
+								self.canvas.coords(
+									self.attributes['temp_line'],
+									gx - self.grid_size / 2,
+									y2,
+									gx - self.grid_size / 2,
+									gy,
+								)
+						elif 'temp_line' in self.attributes:
+							self.canvas.delete(self.attributes['temp_line'])
+							del self.attributes['temp_line']
+					elif gy <= y1 and gx <= x1:
+						if 'temp_line' not in self.attributes:
+							self.attributes['temp_line'] = self.canvas.create_line(
+								x1,
+								y1,
+								gx,
+								gy,
+								dash = (3,3),
+								tags = TAGS_(
+									type = 'line',
+									sub_type = 'west',
+									start = self.attributes['connected_start'],
+								)
+							)
+						else:
+							self.canvas.coords(
+								self.attributes['temp_line'],
+								x1,
+								y1,
+								gx,
+								gy,
+							)
+					elif gy <= y1 and gx > x2:
+						if 'temp_line' not in self.attributes:
+							self.attributes['temp_line'] = self.canvas.create_line(
+								x2,
+								y1,
+								gx,
+								gy,
+								dash = (3,3),
+								tags = TAGS_(
+									type = 'line',
+									sub_type = 'west',
+									start = self.attributes['connected_start'],
+								)
+							)
+						else:
+							self.canvas.coords(
+								self.attributes['temp_line'],
+								x2,
+								y1,
+								gx,
+								gy,
+							)
+					elif gy > y2 and gx <= x1:
+						if 'temp_line' not in self.attributes:
+							self.attributes['temp_line'] = self.canvas.create_line(
+								x1,
+								y2,
+								gx,
+								gy,
+								dash = (3,3),
+								tags = TAGS_(
+									type = 'line',
+									sub_type = 'west',
+									start = self.attributes['connected_start'],
+								)
+							)
+						else:
+							self.canvas.coords(
+								self.attributes['temp_line'],
+								x1,
+								y2,
+								gx,
+								gy,
+							)
+					elif gy > y2 and gx > x2:
+						if 'temp_line' not in self.attributes:
+							self.attributes['temp_line'] = self.canvas.create_line(
+								x2,
+								y2,
+								gx,
+								gy,
+								dash = (3,3),
+								tags = TAGS_(
+									type = 'line',
+									sub_type = 'west',
+									start = self.attributes['connected_start'],
+								)
+							)
+						else:
+							self.canvas.coords(
+								self.attributes['temp_line'],
+								x2,
+								y2,
+								gx,
+								gy,
+							)
+					elif 'temp_line' in self.attributes:
+						self.canvas.delete(self.attributes['temp_line'])
+						del self.attributes['temp_line']
+				case 2:
+					(x1,y1,x2,y2) = self.canvas.coords(self.attributes['temp_line'])
+					self.canvas.coords(
+						self.attributes['temp_line'],
+						x1,
+						y1,
+						x,
+						y,
+					)
+		else:
+			# Not handling connection
+			if eid is None:
+				self.canvas.config(cursor = 'left_ptr')
+				return
+			attrs = self.get_attributes(eid)
+			selected = self.find(('selected',True))
+			if top and len(selected) > 0:
+				# There is an item that is selected
+				val = selected[0]
+				# Cursor starting position
+				(cx1,cy1) = self.attributes['selected_element_cursor_source']
+				# Cursor current position
+				(cx2,cy2) = (x,y)
+				# Cursor movement vector
+				vector = self.get_grid_coords(cx2 - cx1,cy2 - cy1)
+				# Attributes of selected value
+				attrs = self.get_attributes(val)
+				# Type of selected value
+				type_val = self.get_type(attrs,3)
+				hold = set()
+				match type_val:
+					case ('divider',):
+						hold.add(val)
+
+						(top_coords,bottom_coords) = self.attributes['selected_element_source_coords']
+						(tx1,ty1,tx2,ty2) = top_coords
+						(bx1,by1,bx2,by2) = bottom_coords
+						top_attrs = self.get_attributes(attrs['top'])
+						self.place_attribute(
+							attrs['bottom'],
+							bx1,
+							by1 + vector[1],
+							by2 - by1 - vector[1],
+						)
+						match top_attrs.get('sub_type',None):
+							case 'type':
+								self.place_type(
+									attrs['top'],
+									tx1,
+									ty1,
+									tx2,
+									ty2 + vector[1],
+								)
+							case 'attribute':
+								self.place_attribute(
+									attrs['top'],
+									tx1,
+									ty1,
+									ty2 - ty1 + vector[1]
+								)
+							case _:
+								raise TypeError('Invalid sub_type: ' + str(top_attrs.get('sub_type',None)))
+					case ('element','type'):
+						hold |= set(
+							self.find(('parent',val))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
 						self.place_type(
 							val,
+							x1 + vector[0],
+							y1 + vector[1],
+							x2 + vector[0],
+							y2 + vector[1],
+						)
+					case ('border','edge','top'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
+							x1,
+							y1 + vector[1],
+							x2,
+							y2,
+						)
+					case ('border','edge','bottom'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
 							x1,
 							y1,
 							x2,
-							y2 + grid_vector[1],
+							y2 + vector[1],
 						)
-					elif 'attribute' in top_attrs['type']:
-						self.place_attribute(
-							top,
+					case ('border','edge','left'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
+							x1 + vector[0],
+							y1,
+							x2,
+							y2,
+						)
+					case ('border','edge','right'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
 							x1,
 							y1,
-							grid_vector[1],
+							x2 + vector[0],
+							y2,
 						)
-					else:
-						raise TypeError('Invalid type: ' + str(top_attrs['type']))
-				else:
-					raise TypeError('Invalid type: ' + str(attrs['type']))
-		else:
-			self.canvas.config(cursor = 'left_ptr')
+					case ('border','corner','top_left'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
+							x1 + vector[0],
+							y1 + vector[1],
+							x2,
+							y2,
+						)
+					case ('border','corner','top_right'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
+							x1,
+							y1 + vector[1],
+							x2 + vector[0],
+							y2,
+						)
+					case ('border','corner','bottom_left'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
+							x1 + vector[0],
+							y1,
+							x2,
+							y2 + vector[1],
+						)
+					case ('border','corner','bottom_right'):
+						hold |= set(
+							self.find(('parent',attrs['parent']))
+						)
+						(x1,y1,x2,y2) = self.attributes['selected_element_source_coords']
+						self.place_type(
+							attrs['parent'],
+							x1,
+							y1,
+							x2 + vector[0],
+							y2 + vector[1],
+						)
+				hidden = set(
+					self.find(
+						OR_(
+							('type','border'),
+							('type','outline'),
+							('type','divider')
+						)
+					)
+				) - hold
+				for border in hidden:
+					self.canvas.itemconfigure(
+						border,
+						fill = '',
+						outline = ''
+					)
+			elif 'type' in attrs:
+				# There is not an element that is selected
+				for border in self.find(OR_(
+					('type','border'),
+					('type','outline'),
+					('type','divider')
+				)):
+					self.canvas.itemconfigure(
+						border,
+						fill = '',
+						outline = ''
+					)
+				# Set cursor
+				if top:
+					match self.get_type(attrs):
+						case ('text',):
+							self.canvas.config(cursor = 'xterm')
+						case ('border','edge','left'):
+							self.canvas.config(cursor = 'left_side')
+						case ('border','edge','right'):
+							self.canvas.config(cursor = 'right_side')
+						case ('border','edge','top'):
+							self.canvas.config(cursor = 'top_side')
+						case ('border','edge','bottom'):
+							self.canvas.config(cursor = 'bottom_side')
+						case ('border','corner','top_left'):
+							self.canvas.config(cursor = 'top_left_corner')
+						case ('border','corner','top_right'):
+							self.canvas.config(cursor = 'top_right_corner')
+						case ('border','corner','bottom_left'):
+							self.canvas.config(cursor = 'bottom_left_corner')
+						case ('border','corner','bottom_right'):
+							self.canvas.config(cursor = 'bottom_right_corner')
+						case ('element','type') | ('element','attribute'):
+							self.canvas.config(cursor = 'fleur')
+						case ('divider',):
+							self.canvas.config(cursor = 'double_arrow')
+				# Set other behavior for eid
+				match attrs.get('type',None):
+					case 'text' | 'border':
+						# Implies to hovering over parent element
+						self.handle_hover(x,y,False,attrs['parent'])
+					case 'outline':
+						# Equivalent to hovering over parent element
+						self.handle_hover(x,y,top,attrs['parent'])
+					case 'element':
+						for border in self.find(
+							AND_(
+								OR_(
+									('type','border'),
+									('type','outline')
+								),
+								('parent',eid)
+							)
+						):
+							attrs = self.get_attributes(border)
+							self.canvas.itemconfigure(
+								border,
+								outline = attrs['outline'],
+								fill = attrs['fill']
+							)
+					case 'divider':
+						self.canvas.itemconfigure(
+							eid,
+							outline = attrs['outline'],
+							fill = attrs['fill'],
+						)
+					case _:
+						raise TypeError('Invalid type: ' + str(attrs.get('type',None)))
+			else:
+				for border in self.find(OR_(
+					('type','border'),
+					('type','outline'),
+					('type','divider')
+				)):
+					self.canvas.itemconfigure(
+						border,
+						fill = '',
+						outline = ''
+					)
 	def handle_left_click(self,x : int,y : int,top : bool,*eids : tuple[int,...]):
 		self.finish_entries()
-		if len(
-			self.find(
-				('selected',True)
-			)
-		) > 0:
-			self.canvas.dtag(
-				TAG_(('selected',True)),
-				TAG_(('selected',True))
-			)
-			return
-		match len(eids):
-			case 1:
-				eid = eids[0]
-			case 0:
-				eid = None
-			case _:
-				eid = self.event_hierarchy('left-click',*eids)
-		if eid is None:
-			return
-		attrs = self.get_attributes(eid)
-		if 'type' not in attrs:
-			return
-		self.canvas.addtag_withtag(
-			TAG_(('selected',True)),
-			eid
-		)
-		self.attributes['selected_element_cursor_source'] = (x,y)
-		attrs = self.get_attributes(eid)
-		if 'parent' in attrs:
-			self.attributes['selected_element_source_coords'] = self.get_grid_coords(
-				*self.canvas.coords(attrs['parent'])
-			)
+		if 'link_state' in self.attributes:
+			match len(eids):
+				case 1:
+					eid = eids[0]
+				case 0:
+					eid = None
+				case _:
+					eid = self.event_hierarchy('left-click',*eids)
+			if eid is None:
+				del self.attributes['link_state']
+				if 'link_start' in self.attributes:
+					del self.attributes['link_start']
+				if 'link_end' in self.attributes:
+					del self.attributes['link_end']
+			else:
+				if 'link_start' not in self.attributes:
+					self.attributes['link_start'] = eid
+					(x1,y1,x2,y2) = self.canvas.coords(eid)
+					self.attributes['link_line'] = self.canvas.create_line(
+						(x1 + x2) / 2,
+						(y1 + y2) / 2,
+						x,
+						y,
+						dash = (3,3),
+
+						tags = TAGS_(
+							type = 'line',
+							start = eid,
+						)
+					)
+				elif 'link_end' not in self.attributes:
+					self.attributes['link_end'] = eid
+				else:
+					del self.attributes['link_state']
+					del self.attributes['link_start']
+					del self.attributes['link_end']
+		elif 'connected_start' in self.attributes:
+			match self.attributes['connected_state']:
+				case 1:
+					if 'temp_line' in self.attributes:
+						self.attributes['connected_state'] = 2
+					else:
+						del self.attributes['connected_state']
+				case 2:
+					del self.attributes['connected_state']
 		else:
-			self.attributes['selected_element_source_coords'] = self.get_grid_coords(
-				*self.canvas.coords(eid)
+			if len(
+				self.find(
+					('selected',True)
+				)
+			) > 0:
+				self.canvas.dtag(
+					TAG_(('selected',True)),
+					TAG_(('selected',True))
+				)
+				return
+			match len(eids):
+				case 1:
+					eid = eids[0]
+				case 0:
+					eid = None
+				case _:
+					eid = self.event_hierarchy('left-click',*eids)
+			if eid is None:
+				return
+			attrs = self.get_attributes(eid)
+			if 'type' not in attrs:
+				return
+			self.canvas.addtag_withtag(
+				TAG_(('selected',True)),
+				eid
+			)
+			self.attributes['selected_element_cursor_source'] = (x,y)
+			attrs = self.get_attributes(eid)
+			if 'parent' in attrs:
+				self.attributes['selected_element_source_coords'] = self.get_grid_coords(
+					*self.canvas.coords(attrs['parent'])
+				)
+			elif 'top' in attrs and 'bottom' in attrs:
+				self.attributes['selected_element_source_coords'] = (
+					self.get_grid_coords(
+						*self.canvas.coords(attrs['top'])
+					),
+					self.get_grid_coords(
+						*self.canvas.coords(attrs['bottom'])
+					)
+				)
+			else:
+				self.attributes['selected_element_source_coords'] = self.get_grid_coords(
+					*self.canvas.coords(eid)
 			)
 	def handle_right_click(self,x : int,y : int,top : bool,*eids : tuple[int,...]):
 		self.finish_entries()
-		self.attributes['tooltip_coords'] = self.get_grid_coords(x,y)
-		match len(eids):
-			case 1:
-				eid = eids[0]
-			case 0:
-				eid = None
-			case _:
-				eid = self.event_hierarchy('right-click',*eids)
-		if eid is None:
-			self.tooltip.delete(0)
-			add_tooltip = tk.Menu(
-				self.tooltip,
-				tearoff = 0,
-			)
-			if 'tooltip_element' in self.attributes:
-				del self.attributes['tooltip_element']
-			add_tooltip.add_command(
-				label = 'Type',
-				command = self.tooltip_create_type
-			)
-			self.tooltip.insert_cascade(
-				0,
-				label = 'Add',
-				state = 'normal',
-				menu = add_tooltip
-			)
-			self.tooltip.entryconfigure(
-				'Edit',
-				state = 'disabled',
-			)
-			self.tooltip.entryconfigure(
-				'Delete',
-				state = 'disabled',
-			)
+		if 'link_state' in self.attributes:
+			del self.attributes['link_state']
+			if 'link_start' in self.attributes:
+				del self.attributes['link_start']
+			if 'link_end' in self.attributes:
+				del self.attributes['link_end']
+		elif 'connected_start' in self.attributes:
+			del self.attributes['connected_start']
+			if 'temp_line' in self.attributes:
+				self.canvas.delete(self.attributes['temp_line'])
+				del self.attributes['temp_line']
 		else:
-			self.attributes['tooltip_element'] = eid
-			attrs = self.get_attributes(eid)
-			add_tooltip = tk.Menu(
-				self.tooltip,
-				tearoff = 0,
-			)
-			if 'element' in attrs['type']:
-				if 'type' in attrs['type']:
-					add_tooltip.add_command(
-						label = 'Attribute',
-						command = self.tooltip_add_attribute,
-					)
-					add_tooltip.add_command(
-						label = 'Connection',
-					)
-				else:
-					raise TypeError('Invalid type: ' + str(attrs['type']))
-			elif 'border' in attrs['type']:
-				self.handle_right_click(
-					x,
-					y,
-					False,
-					attrs['parent']
+			self.attributes['tooltip_coords'] = self.get_grid_coords(x,y)
+			match len(eids):
+				case 1:
+					eid = eids[0]
+				case 0:
+					eid = None
+				case _:
+					eid = self.event_hierarchy('right-click',*eids)
+			if eid is None:
+				self.tooltip.delete(0)
+				add_tooltip = tk.Menu(
+					self.tooltip,
+					tearoff = 0,
 				)
-				return
+				if 'tooltip_element' in self.attributes:
+					del self.attributes['tooltip_element']
+				add_tooltip.add_command(
+					label = 'Type',
+					command = self.tooltip_create_type
+				)
+				add_tooltip.add_command(
+					label = 'Link',
+					command = self.tooltip_add_link
+				)
+				self.tooltip.insert_cascade(
+					0,
+					label = 'Add',
+					state = 'normal',
+					menu = add_tooltip
+				)
+				self.tooltip.entryconfigure(
+					'Edit',
+					state = 'disabled',
+				)
+				self.tooltip.entryconfigure(
+					'Delete',
+					state = 'disabled',
+				)
 			else:
-				raise TypeError('Invalid type: ' + str(attrs['type']))
-			self.tooltip.delete(0)
-			self.tooltip.insert_cascade(
-				0,
-				label = 'Add',
-				state = 'normal',
-				menu = add_tooltip
-			)
-			self.tooltip.entryconfigure(
-				'Edit',
-				state = 'normal',
-			)
-			self.tooltip.entryconfigure(
-				'Delete',
-				state = 'normal',
-			)
+				self.attributes['tooltip_element'] = eid
+				attrs = self.get_attributes(eid)
+				add_tooltip = tk.Menu(
+					self.tooltip,
+					tearoff = 0,
+				)
+				type_val = self.get_type(attrs,2)
+				match type_val:
+					case ('element','type'):
+						add_tooltip.add_command(
+							label = 'Attribute',
+							command = self.tooltip_add_attribute,
+						)
+						add_tooltip.add_command(
+							label = 'Connection',
+							command = self.tooltip_add_connection,
+						)
+					case ('border','edge') | ('border','corner'):
+						self.handle_right_click(
+							x,
+							y,
+							False,
+							attrs['parent']
+						)
+						return
+					case ():
+						raise TypeError('Invalid type: ' + str(attrs))
+					case _:
+						raise TypeError('Invalid type: ' + str(type_val))
+				self.tooltip.delete(0)
+				self.tooltip.insert_cascade(
+					0,
+					label = 'Add',
+					state = 'normal',
+					menu = add_tooltip
+				)
+				self.tooltip.entryconfigure(
+					'Edit',
+					state = 'normal',
+				)
+				self.tooltip.entryconfigure(
+					'Delete',
+					state = 'normal',
+				)
 	def finish_entries(self):
 		entries = list(self.attributes['entries'].values())
 		for entry in entries:
 			self.finish_entry(entry)
+	def get_type(self,attrs,start = None,end = None) -> tuple[str,...]:
+		if isinstance(attrs,int):
+			return self.get_type(
+				self.get_attributes(attrs),start,end
+			)
+		if end is None:
+			if start is None:
+				start = 0
+				end = float('inf')
+			else:
+				end = start
+				start = 0
+		vals = []
+		i = 0
+		while ('sub_'*i + 'type') in attrs:
+			vals.append(attrs['sub_'*i + 'type'])
+			i += 1
+		if end == float('inf'):
+			return tuple(vals[start:])
+		return tuple(vals[start:end])
 	def get_attributes(self,eid : int) -> dict:
 		attrs = {}
 		for tag in self.canvas.gettags(eid):
 			if '_eq_' not in tag:
 				continue
 			index = tag.index('_eq_')
-			if tag[:index] in attrs:
-				if isinstance(attrs[tag[:index]],set):
-					attrs[tag[:index]].add(
-						VALUE_(tag[index + 4:])
-					)
-				else:
-					attrs[tag[:index]] = {
-						attrs[tag[:index]],
-						VALUE_(tag[index + 4:])
-					}
-			else:
-				attrs[tag[:index]] = VALUE_(tag[index + 4:])
+			attrs[tag[:index]] = VALUE_(tag[index + 4:])
 		return attrs
 	def get_children(self,eid : int) -> set[int]:
 		return self.find(('parent',eid))
@@ -593,10 +1027,8 @@ class GridSpace:
 			x2,
 			y2,
 			tags = TAGS_(
-				type = {
-					'element',
-					'type'
-				}
+				type = 'element',
+				sub_type = 'type',
 			),
 			fill = 'white',
 			outline = 'black',
@@ -606,9 +1038,7 @@ class GridSpace:
 			(y1 + y2) / 2,
 			text = '<Type>',
 			tags = TAGS_(
-				type = {
-					'text'
-				},
+				type = 'text',
 				parent = eid
 			),
 		)
@@ -621,12 +1051,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'corner',
-				},
-				top = True,
-				left = True,
+				type = 'border',
+				sub_type = 'corner',
+				sub_sub_type = 'top_left',
+				fill = 'white',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -639,12 +1068,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'corner',
-				},
-				top = False,
-				left = True,
+				type = 'border',
+				sub_type = 'corner',
+				sub_sub_type = 'bottom_left',
+				fill = 'white',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -657,12 +1085,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'corner',
-				},
-				top = True,
-				left = False,
+				type = 'border',
+				sub_type = 'corner',
+				sub_sub_type = 'top_right',
+				fill = 'white',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -675,12 +1102,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'corner',
-				},
-				top = False,
-				left = False,
+				type = 'border',
+				sub_type = 'corner',
+				sub_sub_type = 'bottom_right',
+				fill = 'white',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -693,11 +1119,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'edge',
-					'left',
-				},
+				type = 'border',
+				sub_type = 'edge',
+				sub_sub_type = 'left',
+				fill = 'yellow',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -710,11 +1136,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'edge',
-					'right',
-				},
+				type = 'border',
+				sub_type = 'edge',
+				sub_sub_type = 'right',
+				fill = 'yellow',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -727,11 +1153,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'edge',
-					'top',
-				},
+				type = 'border',
+				sub_type = 'edge',
+				sub_sub_type = 'top',
+				fill = 'yellow',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -744,11 +1170,11 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'border',
-					'edge',
-					'bottom',
-				},
+				type = 'border',
+				sub_type = 'edge',
+				sub_sub_type = 'bottom',
+				fill = 'yellow',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -775,10 +1201,8 @@ class GridSpace:
 			x2,
 			y2,
 			tags = TAGS_(
-				type = {
-					'element',
-					'attribute',
-				},
+				type = 'element',
+				sub_type = 'attribute',
 				container = container,
 				index = index,
 			),
@@ -790,9 +1214,7 @@ class GridSpace:
 			(y1 + y2) / 2,
 			text = '<Attribute>',
 			tags = TAGS_(
-				type = {
-					'text'
-				},
+				type = 'text',
 				parent = eid
 			),
 		)
@@ -800,14 +1222,14 @@ class GridSpace:
 			x1,
 			y1,
 			x2,
-			y1 + self.attribute_border_thickness,
+			y1 + self.type_border_thickness,
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'divider'
-				},
+				type = 'divider',
 				top = container,
+				fill = 'blue',
+				outline = 'black',
 				bottom = eid
 			),
 		)
@@ -819,10 +1241,10 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'outline',
-					'left',
-				},
+				type = 'outline',
+				sub_type = 'left',
+				fill = 'black',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -834,10 +1256,10 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'outline',
-					'right',
-				},
+				type = 'outline',
+				sub_type = 'right',
+				fill = 'black',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -849,10 +1271,10 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'outline',
-					'top',
-				},
+				type = 'outline',
+				sub_type = 'top',
+				fill = 'black',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -864,10 +1286,10 @@ class GridSpace:
 			fill = '',
 			outline = '',
 			tags = TAGS_(
-				type = {
-					'outline',
-					'bottom',
-				},
+				type = 'outline',
+				sub_type = 'bottom',
+				fill = 'black',
+				outline = 'black',
 				parent = eid
 			),
 		)
@@ -880,42 +1302,40 @@ class GridSpace:
 		left_border = list(
 			self.find(AND_(
 				('type','border'),
-				('type','edge'),
-				('type','left'),
+				('sub_type','edge'),
+				('sub_sub_type','left'),
 				('parent',container),
 			))
 		)[0]
 		right_border = list(
 			self.find(AND_(
 				('type','border'),
-				('type','edge'),
-				('type',"right"),
+				('sub_type','edge'),
+				('sub_sub_type','right'),
 				('parent',container),
 			))
 		)[0]
 		bottom_border = list(
 			self.find(AND_(
 				('type','border'),
-				('type','edge'),
-				('type','bottom'),
+				('sub_type','edge'),
+				('sub_sub_type','bottom'),
 				('parent',container),
 			))
 		)[0]
 		bottom_left_corner = list(
 			self.find(AND_(
 				('type','border'),
-				('type','corner'),
-				('top',False),
-				('left',True),
+				('sub_type','corner'),
+				('sub_sub_type','bottom_left'),
 				('parent',container),
 			))
 		)[0]
 		bottom_right_corner = list(
 			self.find(AND_(
 				('type','border'),
-				('type','corner'),
-				('top',False),
-				('left',False),
+				('sub_type','corner'),
+				('sub_sub_type','bottom_right'),
 				('parent',container),
 			))
 		)[0]
@@ -982,6 +1402,11 @@ class GridSpace:
 			x1,
 			y2,
 		)
+	def tooltip_add_connection(self):
+		self.attributes['connected_start'] = self.attributes['tooltip_element']
+		self.attributes['connected_state'] = 1
+	def tooltip_add_link(self):
+		self.attributes['link_state'] = 0
 	def get_grid_coords(self,*vals):
 		return tuple(
 			round(val / self.grid_size) for val in vals
@@ -992,9 +1417,6 @@ class GridSpace:
 		)
 	def place_type(self,eid : int,x1 : int, y1 : int,x2 : int,y2 : int):
 		attrs = self.get_attributes(eid)
-		(xa,ya,xb,yb) = self.get_grid_coords(
-			*self.canvas.coords(eid)
-		)
 		(x1,y1,x2,y2) = self.get_true_coords(x1,y1,x2,y2)
 		self.canvas.coords(
 			eid,
@@ -1003,7 +1425,17 @@ class GridSpace:
 			x2,
 			y2
 		)
-		width = x2 - x1
+		for text in self.find(
+			AND_(
+				('type','text'),
+				('parent',eid)
+			)
+		):
+			self.canvas.coords(
+				text,
+				(x1 + x2) / 2,
+				(y1 + y2) / 2,
+			)
 		attributes = self.find(
 			AND_(
 				('type','element'),
@@ -1016,104 +1448,96 @@ class GridSpace:
 				self.find(
 					AND_(
 						('type','element'),
-						('type','attribute'),
+						('sub_type','attribute'),
 						('container',eid),
 						('index',i)
 					)
 				)
 			)[0]
 			(xa,ya,xb,yb) = self.canvas.coords(attribute)
+			(m,n,p,q) = self.get_grid_coords(
+				x1,y1 + height,yb,ya
+			)
 			self.place_attribute(
 				attribute,
-				x1,
-				y1 + height,
-				yb - ya
+				m,
+				n,
+				p - q
 			)
 			height += yb - ya
 		y2 = y1 + height
 		for element in self.find(('parent',eid)):
 			attrs = self.get_attributes(element)
-			if 'border' in attrs['type']:
-				if 'corner' in attrs['type']:
-					if attrs['top']:
-						if attrs['left']:
-							self.canvas.coords(
-								element,
-								x1,
-								y1,
-								x1 + self.type_border_thickness,
-								y1 + self.type_border_thickness,
-							)
-						else:
-							self.canvas.coords(
-								element,
-								x2 - self.type_border_thickness,
-								y1,
-								x2,
-								y1 + self.type_border_thickness,
-							)
-					else:
-						if attrs['left']:
-							self.canvas.coords(
-								element,
-								x1,
-								y2 - self.type_border_thickness,
-								x1 + self.type_border_thickness,
-								y2,
-							)
-						else:
-							self.canvas.coords(
-								element,
-								x2 - self.type_border_thickness,
-								y2 - self.type_border_thickness,
-								x2,
-								y2,
-							)
-				elif 'edge' in attrs['type']:
-					if 'left' in attrs['type']:
-						self.canvas.coords(
-							element,
-							x1,
-							y1 + self.type_border_thickness,
-							x1 + self.type_border_thickness,
-							y2 - self.type_border_thickness,
-						)
-					elif 'right' in attrs['type']:
-						self.canvas.coords(
-							element,
-							x2 - self.type_border_thickness,
-							y1 + self.type_border_thickness,
-							x2,
-							y2 - self.type_border_thickness,
-						)
-					elif 'top' in attrs['type']:
-						self.canvas.coords(
-							element,
-							x1 + self.type_border_thickness,
-							y1,
-							x2 - self.type_border_thickness,
-							y1 + self.type_border_thickness,
-						)
-					elif 'bottom' in attrs['type']:
-						self.canvas.coords(
-							element,
-							x1 + self.type_border_thickness,
-							y2 - self.type_border_thickness,
-							x2 - self.type_border_thickness,
-							y2,
-						)
-					else:
-						raise TypeError('Invalid type: ' + str(attrs['type']))
-				else:
-					raise TypeError('Invalid type: ' + str(attrs['type']))
-			elif 'text' in attrs['type']:
-				self.canvas.coords(
-					element,
-					(x1 + x2) / 2,
-					(y1 + y2) / 2,
-				)
-			else:
-				raise TypeError('Invalid type: ' + str(attrs['type']))
+			type_val = self.get_type(attrs,3)
+			match type_val:
+				case ('border','corner','top_left'):
+					self.canvas.coords(
+						element,
+						x1,
+						y1,
+						x1 + self.type_border_thickness,
+						y1 + self.type_border_thickness,
+					)
+				case ('border','corner','top_right'):
+					self.canvas.coords(
+						element,
+						x2 - self.type_border_thickness,
+						y1,
+						x2,
+						y1 + self.type_border_thickness,
+					)
+				case ('border','corner','bottom_left'):
+					self.canvas.coords(
+						element,
+						x1,
+						y2 - self.type_border_thickness,
+						x1 + self.type_border_thickness,
+						y2,
+					)
+				case ('border','corner','bottom_right'):
+					self.canvas.coords(
+						element,
+						x2 - self.type_border_thickness,
+						y2 - self.type_border_thickness,
+						x2,
+						y2,
+					)
+				case ('border','edge','left'):
+					self.canvas.coords(
+						element,
+						x1,
+						y1 + self.type_border_thickness,
+						x1 + self.type_border_thickness,
+						y2 - self.type_border_thickness,
+					)
+				case ('border','edge','right'):
+					self.canvas.coords(
+						element,
+						x2 - self.type_border_thickness,
+						y1 + self.type_border_thickness,
+						x2,
+						y2 - self.type_border_thickness,
+					)
+				case ('border','edge','top'):
+					self.canvas.coords(
+						element,
+						x1 + self.type_border_thickness,
+						y1,
+						x2 - self.type_border_thickness,
+						y1 + self.type_border_thickness,
+					)
+				case ('border','edge','bottom'):
+					self.canvas.coords(
+						element,
+						x1 + self.type_border_thickness,
+						y2 - self.type_border_thickness,
+						x2 - self.type_border_thickness,
+						y2,
+					)
+				case ('text',):
+					pass
+				case _:
+					raise TypeError('Invalid type: ' + str(type_val))
 	def place_attribute(self,eid : int,x1 : int,y1 : int,height : int):
 		attrs = self.get_attributes(eid)
 		container = attrs['container']
@@ -1150,8 +1574,9 @@ class GridSpace:
 			)
 		):
 			attrs = self.get_attributes(element)
-			if 'outline' in attrs['type']:
-				if 'left' in attrs['type']:
+			type_val = self.get_type(attrs,2)
+			match type_val:
+				case ('outline','left'):
 					self.canvas.coords(
 						element,
 						x1,
@@ -1159,7 +1584,7 @@ class GridSpace:
 						x1 + self.attribute_border_thickness,
 						y2,
 					)
-				elif 'right' in attrs['type']:
+				case ('outline','right'):
 					self.canvas.coords(
 						element,
 						x2 - self.attribute_border_thickness,
@@ -1167,7 +1592,7 @@ class GridSpace:
 						x2,
 						y2,
 					)
-				elif 'top' in attrs['type']:
+				case ('outline','top'):
 					self.canvas.coords(
 						element,
 						x1,
@@ -1175,7 +1600,7 @@ class GridSpace:
 						x2,
 						y1 + self.attribute_border_thickness,
 					)
-				elif 'bottom' in attrs['type']:
+				case ('outline','bottom'):
 					self.canvas.coords(
 						element,
 						x1,
@@ -1183,25 +1608,33 @@ class GridSpace:
 						x2,
 						y2,
 					)
-				else:
-					raise TypeError('Invalid type: ' + str(attrs['type']))
-			elif 'text' in attrs['type']:
-				self.canvas.coords(
-					element,
-					(x1 + x2) / 2,
-					(y1 + y2) / 2,
-				)
-			elif 'divider' in attrs['type']:
-				self.canvas.coords(
-					element,
-					x1,
-					y1,
-					x2,
-					y1 + self.attribute_border_thickness,
-				)
-			else:
-				raise TypeError('Invalid type: ' + str(attrs['type']))
+				case ('text',):
+					self.canvas.coords(
+						element,
+						(x1 + x2) / 2,
+						(y1 + y2) / 2,
+					)
+				case ('divider',):
+					self.canvas.coords(
+						element,
+						x1,
+						y1,
+						x2,
+						y1 + self.attribute_border_thickness,
+					)
+				case _:
+					raise TypeError('Invalid type: ' + str(type_val))
 	def right_click(self,event):
+		overlapping = set(
+			self.canvas.find_overlapping(
+				event.x,
+				event.y,
+				event.x,
+				event.y
+			)
+		) & set(
+			self.canvas.find((''))
+		)
 		self.handle_right_click(
 			event.x,
 			event.y,
@@ -1266,9 +1699,7 @@ class GridSpace:
 				coords[1],
 				window = entry_box,
 				tags = TAGS_(
-					type = {
-						'entry'
-					},
+					type = 'entry',
 					parent = parent
 				),
 				width = round(xlen // 3),
@@ -1316,9 +1747,7 @@ class GridSpace:
 			coords[1],
 			text = text,
 			tags = TAGS_(
-				type = {
-					'text'
-				},
+				type = 'text',
 				parent = parent
 			),
 		)
