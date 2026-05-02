@@ -8,18 +8,6 @@ from typing import (
 )
 from collections.abc import Mapping
 
-'''
-define entity
-define entity(arguments)
-define entity = ?pattern?
-define entity = attributes
-define entity < reference
-define any > reference
-define reference : any
-define (arguments)
-define operator/(order)
-'''
-
 CONDITIONS_ORDER = [
 	':',
 	'<',
@@ -76,7 +64,7 @@ def contains_exact(values : Iterable,other : Any) -> bool:
 	vals = [m for m,v in zip(match_values,values) if m == max_match]
 	return len(vals) == 1
 def set_parent(value,parent) -> None:
-	if value is not None:
+	if hasattr(value,'parent'):
 		value.parent = parent
 
 class All:
@@ -147,87 +135,54 @@ class Clause(All):
 			x = self.parent
 		return x
 	def reference(self) -> Reference:
-
-class Hierarchy(Clause):
-	def __init__(self,*values : tuple[Any...]) -> None:
-		self.values = {value for value in values}
+		if isinstance(self,Hierarchy):
+			return Reference()
+		return self.parent.reference() + self.header()
+class CollectionClause(Clause):
+	def __init__(self,*values):
+		if len(values) == 1:
+			if type(values[0]) == type(self):
+				self.values = [value for value in values[0].values]
+			elif isinstance(values[0],set | frozenset | list | tuple):
+				self.values = [value for value in values[0]]
+			else:
+				self.values = [values[0]]
+		else:
+			self.values = [value for value in values]
 		for value in self.values:
 			set_parent(value,self)
 	def __iter__(self) -> iter:
 		return iter(self.values)
 	def __len__(self) -> int:
 		return len(self.values)
-	def __getitem__(self,index : Any) -> Any:
-		if isinstance(index,Reference):
-			if len(index) == 0:
-				return self
-			return self[index[0]][index[1:]]
-		return get_at(index,self)
-	def __setitem__(self,index : Any,other : Any) -> None:
-		if isinstance(index,Reference):
-			if len(index) == 1:
-				self.values[index[0]] = other
-			else:
-				self[index[0]][index[1:]] = other
-		else:
-			set_at(index,other,self)
-	def __delitem__(self,index : Any) -> None:
-		if isinstance(index,Reference):
-			if len(index) == 1:
-				self.values[index[0]] = other
-			else:
-				self[index[0]][index[1:]] = other
-		else:
-			del_at(index,other,self)
-	def __str__(self) -> str:
-		return ','.join(str(value) for value in self)
-	def __squash__(self) -> tuple[str,Any]:
-		return ('Hierarchy',squash(self.values))
-	def add(self,other : Any) -> None:
-		if not contains_close(self,other):
-			self.values.append(other)
-	def cd(self,index : Reference):
-		match len(index):
-			case 0:
-				return self
-			case 1:
-				return self[index[0]]
-			case _:
-				return self[index[0]][index[1:]]
-	def remove(self,other : Any) -> None:
-		del self[other]
-class NameList(Clause):
-	def __init__(self,*names) -> None:
-		match len(names):
-			case 0:
-				raise TypeError
-			case 1:
-				if isinstance(names[0],NameList):
-					self.values = names[0].values
-				else:
-					self.values = {names[0]}
-			case _:
-				self.values = set(names)
-	def __str__(self) -> str:
-		return ','.join(sorted(list(str(value) for value in self.values)))
-	def __iter__(self) -> iter:
-		return iter(self.values)
-	def __len__(self) -> int:
-		return len(self.values)
+	def __getitem__(self,index : int | slice) -> Any:
+		if isinstance(index,int):
+			return self.values[index]
+		return self.__class__(*self.values[index])
+	def __setitem__(self,index : int,other : Any) -> None:
+		self.values[index] = other
+	def __delitem__(self,index : int) -> None:
+		del self.values[index]
 	def __contains__(self,other : Any) -> bool:
 		return other in self.values
-	def __or__(self,other : NameList) -> NameList:
-		return NameList(*(self.values | other.values))
-	def __and__(self,other : NameList) -> NameList:
-		return NameList(*(self.values & other.values))
-	def __sub__(self,other : NameList) -> NameList:
-		return NameList(*(self.values - other.values))
-	def __xor__(self,other : NameList) -> NameList:
-		return NameList(*(self.values ^ other.values))
-	def add(self,other) -> None:
-		self.values.add(other)
-	def remove(self,other) -> None:
-		self.values.remove(other)
+	def __squash__(self) -> tuple:
+		return (type(self).__name__,squash(self.values))
+	def __str__(self) -> str:
+		return self.delimiter.join(str(value) for value in self)
+class ListClause(CollectionClause):
+	def __init__(self,*values) -> None:
+		super().__init__(*values)
+		self.delimiter = ','
+class GroupedClause(ListClause):
+	def __str__(self) -> str:
+		return self.left + super().__str__() + self.right
+
+class Hierarchy(ListClause):
+	def __init__(self,*values) -> None:
+		super().__init__(*values)
+class NameList(ListClause):
+	def __init__(self,*values):
+		super().__init__(*values)
 class Entity(Clause):
 	def __init__(self,**kargs : dict[str,Any]) -> None:
 		self.names = NameList(
@@ -235,7 +190,7 @@ class Entity(Clause):
 				'names',
 				kargs.get(
 					'name',
-					None
+					[]
 				)
 			)
 		)
@@ -254,7 +209,7 @@ class Entity(Clause):
 		self.conditions = Conditions(
 			kargs.get(
 				'conditions',
-				None
+				[]
 			)
 		)
 		set_parent(self.names,self)
@@ -312,7 +267,7 @@ class Entity(Clause):
 				result += ' ' + k + ' ' + str(v)
 		return result
 class Conditions(Clause):
-	def __init__(self,args : dict[str,Any]) -> None:
+	def __init__(self,args : dict[str,Any] = {}) -> None:
 		self.values = {k : v for k,v in args.items()}
 		for v in self.conditions.values():
 			set_parent(v,self)
@@ -365,75 +320,57 @@ class Conditions(Clause):
 		return self.values.values()
 	def items(self) -> ItemsView:
 		return self.values.items()
-class ArgumentList(Clause):
+class ArgumentList(GroupedClause):
 	def __init__(self,*values) -> None:
-		self.values = tuple([value for value in values])
-	def __iter__(self) -> iter:
-		return iter(self.values)
-	def __len__(self,index : int) -> int:
-		return len(self.values)
-	def __getitem__(self,index : int | Argument | Reference) -> Argument:
-		if isinstance(index,int):
-			return self.values[index]
-		if isinstance(index,Reference):
-			if len(index) == 0:
-				return self
-			return self[index[0]][index[1:]]
-		if isinstance(index,Argument):
-			return get_at(index,self)
-		raise KeyError('ArgumentList[' + type(index).__name__ + ']')
-	def __setitem__(self,index : int | Argument | Reference,other : Any) -> None:
-		if isinstance(index,int):
-			self.values[index] = other
-		elif isinstance(index,Reference):
-			if len(index) == 1:
-				self[index[0]] = other
-			else:
-				self[index[0]][index[1:]] = other
-		elif isinstance(index,Argument):
-			set_at(index,other,self)
-		else:
-			raise KeyError('ArgumentList[' + type(index).__name__ + ']')
-	def __delitem__(self,index : int | Argument | Reference) -> None:
-		if isinstance(index,int):
-			del self.values[index]
-		elif isinstance(index,Reference):
-			if len(index) == 1:
-				del self.values[index]
-			else:
-				del self[index[0]][index[1:]]
-		elif isinstance(index,Argument):
-			del_at(index,self)
-		else:
-			raise KeyError('ArgumentList[' + type(index).__name__ + ']')
-	def __contains__(self,other : Any) -> bool:
-		return contains_close(self,other)
+		super().__init__(*values)
+		(self.left,self.right) = ('(',')')
+class AttributeList(GroupedClause):
+	def __init__(self,*values) -> None:
+		super().__init__(*values)
+		(self.left,self.right) = ('{','}')
+class Argument(Clause):
+	pass
+class PositionalDelimiter(Argument):
+	def __init__(self) -> None:
+		pass
 	def __str__(self) -> str:
-		return '(' + ','.join(str(value) for value in self) + ')'
-	def insert(self,index : int | Argument | Reference,other : Argument) -> None:
-		if isinstance(index,int):
-			self.values.insert(index,other)
-		elif isinstance(index,Reference):
-			if len(index) == 1:
-				self.insert(index[0],other)
-			else:
-				self[index[0]].insert(index[1:],other)
-		elif isinstance(index,Argument):
-			insert_at(index,other,self)
-		else:
-			raise KeyError('ArgumentList[' + type(index).__name__ + ']')
-	def add(self,other : Argument) -> None:
-		self.values.append(other)
-class AttributeList(Clause):
-	def __init__(self,*values : tuple[Any...]) -> None:
-		self.values = {value for value in values}
-	def __iter__(self) -> iter:
-		return iter(self.values)
-	def __len__(self) -> int:
-		return len(self.values)
-	def __getitem__(self,index : Any) -> Any:
-		if isinstance(index,Reference):
-			if len(index) == 0:
-				return self
-			return self[index[0]][index[1:]]
-		return get_at(index,self)
+		return '<-'
+	def __squash__(self) -> tuple[str]:
+		return ('PositionalDelimiter',)
+class RealArgument(Argument):
+	def __init__(name,conditions = {}) -> None:
+		self.name = name
+		self.conditions = Conditions(conditions)
+	def __str__(self) -> str:
+		result = self.prefix + str(self.name)
+		if len(self.conditions) > 0:
+			result += ' ' + str(self.conditions)
+		return result
+	def __squash__(self):
+		return (
+			type(self).__name__,
+			squash(self.name),
+			squash(self.conditions)
+		)
+class BasicArgument(RealArgument):
+	def __init__(name,conditions = {}) -> None:
+		super().__init__(name,conditions)
+		self.prefix = ''
+class ComplexArgument(Argument):
+	pass
+class ListArgument(ComplexArgument):
+	def __init__(name,conditions = {}) -> None:
+		super().__init__(name,conditions)
+		self.prefix = '*'
+class DictArgument(ComplexArgument):
+	def __init__(name,conditions = {}) -> None:
+		super().__init__(name,conditions)
+		self.prefix = '**'
+class Union(CollectionClause):
+	def __init__(self,*values) -> None:
+		super().__init__(*values)
+		self.delimiter = '|'
+class Intersection(CollectionClause):
+	def __init__(self,*values) -> None:
+		super().__init__(*values)
+		self.delimiter = '&'
