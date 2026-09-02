@@ -1,0 +1,6 @@
+Entity {
+	EntityId: int
+}
+NamedEntity < Entity
+Intersection < Entity
+Union < Entity
