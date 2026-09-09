@@ -3,6 +3,9 @@
 AST::AST(const std::string op,const std::vector<AST>& args):
 	op(op),
 	args(args) {};
+AST::AST(const char op,const std::vector<AST>& args):
+	op("" + op),
+	args(args) {};
 
 std::string to_string(const AST& value) {
 	if (value.args.size() == 0) return value.op;

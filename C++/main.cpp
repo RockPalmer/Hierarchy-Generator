@@ -16,7 +16,7 @@
 #include "ArgumentGroupRow.h"
 #include "AST.h"
 /*
-g++ -o ArgumentGroupRow.cpp ArgumentNameRow.cpp ArgumentRow.cpp AST.cpp EntityArgumentListRow.cpp EntityEqualityRow.cpp EntityGroupRow.cpp EntityNameRow.cpp EntityRow.cpp main.cpp
+g++ ArgumentGroupRow.cpp ArgumentNameRow.cpp ArgumentRow.cpp AST.cpp EntityArgumentListRow.cpp EntityEqualityRow.cpp EntityGroupRow.cpp EntityNameRow.cpp EntityRow.cpp main.cpp -o main
 */
 
 std::set<EntityRow> ENTITIES;
@@ -113,12 +113,12 @@ AST parse(const std::string expression) {
 		};
 	};
 	if (left.size() > 0 && left[0] == 0 && right[0] == expression.length() - 1) return AST(
-		expression[left[0]] + expression[right[0]],
+		"" + expression[left[0]] + expression[right[0]],
 		{parse(expression.substr(left[0] + 1,right[0] - left[0] - 1))}
 	);
 	std::vector<size_t> indices;
 	if (left.size() > 0) {
-		for (const charcl op : BINOPS) {
+		for (const char op : BINOPS) {
 			indices = filter(getIndices(expression,op),left[0],right[0]);
 			if (indices.size() > 0) {
 				return AST(
@@ -150,5 +150,5 @@ AST parse(const std::string expression) {
 	return AST(expression,{});
 };
 int main() {
-	std::cout << parse("type1 < type2,type1 : type2,type1 = type2,{type1},type1(type2)")
+	std::cout << parse("type1 < type2,type1 : type2,type1 = type2,{type1},type1(type2)");
 };

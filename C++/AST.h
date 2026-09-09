@@ -10,6 +10,7 @@ struct AST {
 	std::vector<AST> args;
 
 	AST(const std::string op,const std::vector<AST>& args);
+	AST(const char op,const std::vector<AST>& args);
 };
 
 std::string to_string(const AST& value);
