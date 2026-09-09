@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <ostream>
+#include <iostream>
 
 struct AST {
 	std::string op;

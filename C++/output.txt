@@ -1,0 +1,55 @@
+parse("type1 < type2,type1 : type2,type1 = type2,{type1},type1(type2)") {
+ parse("type1 < type2") {
+  parse("type1 ") {
+   parse("type1") {
+   } -> type1
+  } -> type1
+  parse(" type2") {
+   parse("type2") {
+   } -> type2
+  } -> type2
+ } -> type1<type2
+ parse("type1 : type2,type1 = type2,{type1},type1(type2)") {
+  parse("type1 : type2") {
+   parse("type1 ") {
+    parse("type1") {
+    } -> type1
+   } -> type1
+   parse(" type2") {
+    parse("type2") {
+    } -> type2
+   } -> type2
+  } -> type1:type2
+  parse("type1 = type2,{type1},type1(type2)") {
+   parse("type1 = type2") {
+    parse("type1 ") {
+     parse("type1") {
+     } -> type1
+    } -> type1
+    parse(" type2") {
+     parse("type2") {
+     } -> type2
+    } -> type2
+   } -> type1=type2
+   parse("{type1},type1(type2)") {
+    parse("{type1}") {
+     >>{
+     >>}
+     parse("type1") {
+     } -> type1
+    } -> {type1}
+    parse("type1(type2)") {
+     parse("type1") {
+     } -> type1
+     parse("(type2)") {
+      >>(
+      >>)
+      parse("type2") {
+      } -> type2
+     } -> (type2)
+    } -> type1 (type2)
+   } -> {type1},type1 (type2)
+  } -> type1=type2,{type1},type1 (type2)
+ } -> type1:type2,type1=type2,{type1},type1 (type2)
+} -> type1<type2,type1:type2,type1=type2,{type1},type1 (type2)
+type1<type2,type1:type2,type1=type2,{type1},type1 (type2)
