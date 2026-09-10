@@ -1,6 +1,24 @@
-Entity {
-	EntityId: int
-}
-NamedEntity < Entity
-Intersection < Entity
-Union < Entity
+
+Entity < Entity
+Entity < NamedArgument
+Entity < Intersection
+NamedArgument < Entity
+NamedArgument < NamedArgument
+NamedArgument < Intersection
+Entity > Entity
+Entity > NamedArgument
+NamedArgument < Entity
+NamedArgument < NamedArgument
+&(Entity)
+&(NamedArgument)
+|(Entity)
+|(NamedArgument)
+Entity : Entity
+Entity : NamedArgument
+Entity : Union
+NamedArgument : Entity
+NamedArgument : NamedArgument
+NamedArgument : Intersection
+Entity = Entity
+Entity = Intersection
+Entity = 
