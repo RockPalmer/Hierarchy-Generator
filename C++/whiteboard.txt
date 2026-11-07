@@ -22,3 +22,13 @@ NamedArgument : Intersection
 Entity = Entity
 Entity = Intersection
 Entity = 
+
+define name:
+	id = add new entity ID
+	add (name,id) to ENTITY_NAMES
+define name = name:
+	id = select id from ENTITY_NAMES where name = name
+	add (name,id) to ENTITY_NAMES
+define name = union:
+	id = select id from ENTITY_NAMES where name = name
+	add name

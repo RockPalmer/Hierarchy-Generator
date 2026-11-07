@@ -119,8 +119,10 @@ std::vector<size_t> filter(const std::vector<size_t>& values,const size_t bottom
 	return vals;
 };
 AST parse(const std::string expression) {
-	prt("parse(\"" + expression + "\") {");
-	up();
+	//prt("parse(\"" + expression + "\") {");
+	//up();
+
+	/* TRIM EXPRESSION */
 	if (
 		expression.length() > 0 && (
 			std::isspace(expression[0]) ||
@@ -128,8 +130,8 @@ AST parse(const std::string expression) {
 		)
 	) {
 		AST x = parse(strip(expression));
-		dn();
-		prt("} -> " + to_string(x));
+		//dn();
+		//prt("} -> " + to_string(x));
 		return AST(x);
 	};
 	std::vector<size_t> left,right;
@@ -152,14 +154,12 @@ AST parse(const std::string expression) {
 		};
 	};
 	if (left.size() > 0 && left[0] == 0 && right[0] == expression.length() - 1) {
-		prt(">>" + expression.substr(left[0],1));
-		prt(">>" + expression.substr(right[0],1));
 		AST x = AST(
 			expression.substr(left[0],1) + expression.substr(right[0],1),
 			{parse(expression.substr(left[0] + 1,right[0] - left[0] - 1))}
 		);
-		dn();
-		prt("} -> " + to_string(x));
+		//dn();
+		//prt("} -> " + to_string(x));
 		return AST(x);
 	};
 	std::vector<size_t> indices;
@@ -175,8 +175,8 @@ AST parse(const std::string expression) {
 					parse(expression.substr(indices[0] + op.length()))
 				}
 			);
-			dn();
-			prt("} -> " + to_string(x));
+			//dn();
+			//prt("} -> " + to_string(x));
 			return AST(x);
 		};
 	};
@@ -191,8 +191,8 @@ AST parse(const std::string expression) {
 					parse(expression.substr(op.length()))
 				}
 			);
-			dn();
-			prt("} -> " + to_string(x));
+			//dn();
+			//prt("} -> " + to_string(x));
 			return AST(x);
 		};
 	};
@@ -204,8 +204,8 @@ AST parse(const std::string expression) {
 					parse(expression.substr(i + 1,expression.length() - i))
 				}
 			);
-			dn();
-			prt("} -> " + to_string(x));
+			//dn();
+			//prt("} -> " + to_string(x));
 			return AST(x);
 		};
 	};
@@ -216,15 +216,15 @@ AST parse(const std::string expression) {
 				parse(expression.substr(left[0],expression.length() - left[0]))
 			}
 		);
-		dn();
-		prt("} -> " + to_string(x));
+		//dn();
+		//prt("} -> " + to_string(x));
 		return AST(x);
 	};
 	AST x = AST(expression,{});
-	dn();
-	prt("} -> " + to_string(x));
+	//dn();
+	//prt("} -> " + to_string(x));
 	return AST(x);
 };
 int main() {
-	std::cout << parse("type1 < type2,type1 : type2,type1 = type2,{type1},type1(type2)");
+	std::cout << parse("type1 < type2,type1 : #type2,type1 = type2,type1{type2},type1(type2)") << "\n";
 };
