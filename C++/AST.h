@@ -3,18 +3,38 @@
 
 #include <string>
 #include <vector>
-#include <ostream>
-#include <iostream>
+
+#include "ASTType.h"
 
 struct AST {
-	std::string op;
-	std::vector<AST> args;
+	ASTType type;
+	std::vector<AST> arguments;
+	std::vector<std::string> op;
 
-	AST(const std::string op,const std::vector<AST>& args);
-	AST(const char op,const std::vector<AST>& args);
+	AST();
+	AST(const char op);
+	AST(const std::string op);
+	AST(const ASTType type,const std::vector<AST>& arguments,const std::vector<std::string>& op);
+	AST(const std::vector<AST>& arguments);
+	AST(const std::vector<AST>::iterator start,const std::vector<AST>::iterator end);
+
+	size_t size() const;
+
+	AST& operator[](size_t index);
+	const AST& operator[](size_t index) const;
+
+	std::vector<AST>::iterator begin();
+	std::vector<AST>::iterator end();
+
+	std::vector<AST>::const_iterator begin() const;
+	std::vector<AST>::const_iterator end() const;
+
+	std::string to_string() const;
+	std::string repr() const;
+
+	void insert(const std::vector<AST>::iterator i1,const std::vector<AST>::iterator i2,const std::vector<AST>::iterator i3);
+	void push_back(const AST& ast);
+	void clear();
 };
-
-std::string to_string(const AST& value);
-std::ostream& operator<<(std::ostream& v1,const AST v2);
 
 #endif

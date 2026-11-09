@@ -1,27 +1,92 @@
 #include "AST.h"
 
-AST::AST(const std::string op,const std::vector<AST>& args):
-	op(op),
-	args(args) {};
-AST::AST(const char op,const std::vector<AST>& args):
-	op("" + op),
-	args(args) {};
+AST::AST():
+	AST("") {};
+AST::AST(const char op):
+	AST(std::string(1,op)) {};
+AST::AST(const std::string op):
+	AST(NONE,{},{op}) {};
+AST::AST(const ASTType type,const std::vector<AST>& arguments,const std::vector<std::string>& op):
+	type(type),
+	arguments(arguments),
+	op(op) {};
+AST::AST(const std::vector<AST>& arguments):
+	AST(BINARY,arguments,{""}) {};
+AST::AST(const std::vector<AST>::iterator start,const std::vector<AST>::iterator end):
+	AST(std::vector<AST>(start,end)) {};
 
-std::string to_string(const AST& value) {
-	/*std::string result = "('" + value.op + "',[";
-	if (value.args.size() > 0)
-		result += to_string(value.args[0]);
-	for (size_t i = 1;i < value.args.size();++i)
-		result += "," + to_string(value.args[i]);
-	return result + "])";*/
-	switch (value.args.size()) {
-		case 0: return value.op;
-		case 1:
-			if (value.op == "{}" || value.op == "()") return value.op[0] + to_string(value.args[0]) + value.op[1];
-			return value.op + to_string(value.args[0]);
-		default: return to_string(value.args[0]) + value.op + to_string(value.args[1]);
-	};
+size_t AST::size() const {
+	return arguments.size();
 };
-std::ostream& operator<<(std::ostream& v1,const AST v2) {
-	return v1 << to_string(v2);
+
+AST& AST::operator[](size_t index) {
+	return arguments[index];
+};
+const AST& AST::operator[](size_t index) const {
+	return arguments[index];
+};
+
+std::vector<AST>::iterator AST::begin() {
+	return arguments.begin();
+};
+std::vector<AST>::iterator AST::end() {
+	return arguments.end();
+};
+
+std::vector<AST>::const_iterator AST::begin() const {
+	return arguments.begin();
+};
+std::vector<AST>::const_iterator AST::end() const {
+	return arguments.end();
+};
+
+std::string AST::to_string() const {
+	std::string r;
+	switch (type) {
+		case NONE: return op[0];
+		case GROUPER: return op[0] + arguments[0].to_string() + op[1];
+		case UNARY: return op[0] + arguments[0].to_string();
+		case BINARY:
+			r = arguments[0].to_string();
+			for (size_t i = 1; i < arguments.size(); ++i) {
+				r += op[0] + arguments[i].to_string();
+			};
+			return r;
+	};
+	return r;
+};
+std::string AST::repr() const {
+	std::string r = "AST(";
+	switch (type) {
+		case NONE: r += "NONE"; break;
+		case GROUPER: r += "GROUPER"; break;
+		case UNARY: r += "UNARY"; break;
+		case BINARY: r += "BINARY"; break;
+	};
+	r += ",[";
+	if (arguments.size() > 0) {
+		r += arguments[0].repr();
+	};
+	for (size_t i = 1; i < arguments.size(); ++i) {
+		r += "," + arguments[i].repr();
+	};
+	r += "],[";
+	if (op.size() > 0) {
+		r += "\"" + op[0] + "\"";
+	};
+	for (size_t i = 1; i < op.size(); ++i) {
+		r += ",\"" + op[i] + "\"";
+	};
+	r += "])";
+	return r;
+};
+
+void AST::insert(const std::vector<AST>::iterator i1,const std::vector<AST>::iterator i2,const std::vector<AST>::iterator i3) {
+	arguments.insert(i1,i2,i3);
+};
+void AST::push_back(const AST& ast) {
+	arguments.push_back(ast);
+};
+void AST::clear() {
+	arguments.clear();
 };

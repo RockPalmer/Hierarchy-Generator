@@ -1,230 +1,140 @@
-#include <vector>
-
 #include <string>
 #include <vector>
-#include <set>
-#include <cctype>
+#include <sstream>
 #include <iostream>
 
-#include "EntityRow.h"
-#include "EntityNameRow.h"
-#include "EntityGroupRow.h"
-#include "EntityArgumentListRow.h"
-#include "EntityEqualityRow.h"
-#include "ArgumentRow.h"
-#include "ArgumentNameRow.h"
-#include "ArgumentGroupRow.h"
 #include "AST.h"
-/*
-g++ ArgumentGroupRow.cpp ArgumentNameRow.cpp ArgumentRow.cpp AST.cpp EntityArgumentListRow.cpp EntityEqualityRow.cpp EntityGroupRow.cpp EntityNameRow.cpp EntityRow.cpp main.cpp -o main
-*/
 
-size_t iter = 0;
-
-std::set<EntityRow> ENTITIES;
-std::set<EntityNameRow> ENTITY_NAMES;
-std::set<EntityArgumentListRow> ENTITY_ARGUMENT_LISTS;
-std::set<EntityGroupRow> ENTITY_INTERSECTIONS;
-std::set<EntityGroupRow> ENTITY_UNIONS;
-std::set<EntityGroupRow> ATTRIBUTION;
-std::set<EntityGroupRow> INHERITANCE;
-std::set<EntityGroupRow> TYPES;
-std::set<ArgumentRow> ARGUMENTS;
-std::set<ArgumentNameRow> ARGUMENT_NAMES;
-std::set<ArgumentGroupRow> ARGUMENT_TYPES;
-std::set<ArgumentGroupRow> ARGUMENT_INHERITANCE;
-std::set<ArgumentGroupRow> ARGUMENT_CONTAINERS;
-std::set<EntityEqualityRow> EQUALITIES;
-
-std::vector<std::string> BINOPS = {
-	";",
-	",",
-	"<",
-	">",
-	"=",
-	":",
-	"*",
-	"|",
-	"&",
-	"^",
-	"@",
-	".",
-	"!",
-};
-std::vector<std::string> UNOPS = {
-	"+",
-	"-",
-	"#",
-	"~"
-};
-
-AST parse(const std::string expression);
-std::string lstrip(const std::string value);
-std::string rstrip(const std::string value);
-std::string strip(const std::string value);
-std::vector<size_t> getIndices(const std::string& a,const std::string& b);
-std::vector<size_t> filter(const std::vector<size_t>& values,const size_t bottom,const size_t top);
-void prt(const std::string value);
-void up();
-void dn();
 int main();
+AST splitWhitespace(const AST& str);
+AST parse(const AST& ast);
+AST parseGroupers(const AST& tokens);
+AST tokenize(const AST& ast);
 
-//---------------------
+//------------------------------------------------------------------------------
 
-void prt(const std::string value) {
-	for (size_t i = 0;i < iter;i++) std::cout << " ";
-	std::cout << value << std::endl;
-};
-void up() {
-	++iter;
-};
-void dn() {
-	--iter;
-};
-std::string lstrip(const std::string value) {
-	if (value.length() > 0 && std::isspace(value[0]))
-		for (size_t i = 0;i < value.length();i++)
-			if (!std::isspace(value[i]))
-				return value.substr(i);
-	return value;
-};
-std::string rstrip(const std::string value) {
-	if (value.length() > 0 && std::isspace(value[value.length() - 1]))
-		for (size_t i = 0;i < value.length();i++)
-			if (!std::isspace(value[value.length() - i - 1]))
-				return value.substr(0,value.length() - i);
-	return value;
-};
-std::string strip(const std::string value) {
-	return lstrip(rstrip(value));
-};
-std::vector<size_t> getIndices(const std::string& a,const std::string& b) {
-    std::vector<size_t> indices;
+AST splitWhitespace(const AST& str) {
+	std::vector<AST> result;
+	std::istringstream iss(str.to_string());
+	std::string word;
 
-    if (b.empty()) return indices;
+	while (iss >> word) result.emplace_back(word);
 
-    size_t pos = a.find(b);
-    while (pos != std::string::npos) {
-        indices.push_back(pos);
-        pos = a.find(b,pos + 1);
-    };
-
-    return indices;
-}
-std::vector<size_t> filter(const std::vector<size_t>& values,const size_t bottom,const size_t top) {
-	std::vector<size_t> vals;
-	for (const size_t v : values)
-		if (bottom > v || v > top)
-			vals.push_back(v);
-	return vals;
+	return AST(result);
 };
-AST parse(const std::string expression) {
-	//prt("parse(\"" + expression + "\") {");
-	//up();
-
-	/* TRIM EXPRESSION */
-	if (
-		expression.length() > 0 && (
-			std::isspace(expression[0]) ||
-			std::isspace(expression[expression.length() - 1])
-		)
-	) {
-		AST x = parse(strip(expression));
-		//dn();
-		//prt("} -> " + to_string(x));
-		return AST(x);
-	};
-	std::vector<size_t> left,right;
-
-	for (size_t i = 0;i < expression.length();i++) {
-		switch (expression[i]) {
+AST tokenize(const AST& ast) {
+	std::string str = ast.to_string();
+	AST a;
+	std::string item = "";
+	for (size_t i = 0; i < str.length(); ++i) {
+		switch (str[i]) {
+			case '\t':
+			case '\n':
+			case ' ':
+				if (item.length() > 0) {
+					a.push_back(AST(item));
+				};
+				item = "";
+				break;
 			case '(':
-			case '{':
-				left.push_back(i);
-				right.push_back(std::string::npos);
-				break;
 			case ')':
+			case '{':
 			case '}':
-				for (size_t j = 0;j < left.size();i++)
-					if (right[right.size() - j - 1] == std::string::npos) {
-						right[right.size() - j - 1] = i;
-						break;
-					};
+			case '=':
+			case '<':
+			case ':':
+				if (item.length() > 0) {
+					a.push_back(AST(item));
+				};
+				item = "";
+				a.push_back(AST(str[i]));
+				break;
+			default:
+				item += str[i];
 				break;
 		};
 	};
-	if (left.size() > 0 && left[0] == 0 && right[0] == expression.length() - 1) {
-		AST x = AST(
-			expression.substr(left[0],1) + expression.substr(right[0],1),
-			{parse(expression.substr(left[0] + 1,right[0] - left[0] - 1))}
-		);
-		//dn();
-		//prt("} -> " + to_string(x));
-		return AST(x);
-	};
-	std::vector<size_t> indices;
-	for (const std::string op : BINOPS) {
-		if (left.size() > 0)
-			indices = filter(getIndices(expression,op),left[0],right[0]);
-		else
-			indices = getIndices(expression,op);
-		if (indices.size() > 0) {
-			AST x = AST(
-				op,{
-					parse(expression.substr(0,indices[0])),
-					parse(expression.substr(indices[0] + op.length()))
-				}
-			);
-			//dn();
-			//prt("} -> " + to_string(x));
-			return AST(x);
-		};
-	};
-	for (const std::string op : UNOPS) {
-		if (left.size() > 0)
-			indices = filter(getIndices(expression,op),left[0],right[0]);
-		else
-			indices = getIndices(expression,op);
-		if (indices.size() > 0 && indices[0] == 0) {
-			AST x = AST(
-				op,{
-					parse(expression.substr(op.length()))
-				}
-			);
-			//dn();
-			//prt("} -> " + to_string(x));
-			return AST(x);
-		};
-	};
-	for (size_t i = 0;i < expression.length();i++) {
-		if (std::isspace(expression[i])) {
-			AST x = AST(
-				"",{
-					parse(expression.substr(0,i)),
-					parse(expression.substr(i + 1,expression.length() - i))
-				}
-			);
-			//dn();
-			//prt("} -> " + to_string(x));
-			return AST(x);
-		};
-	};
-	if (left.size() > 0) {
-		AST x = AST(
-			"",{
-				parse(expression.substr(0,left[0])),
-				parse(expression.substr(left[0],expression.length() - left[0]))
-			}
-		);
-		//dn();
-		//prt("} -> " + to_string(x));
-		return AST(x);
-	};
-	AST x = AST(expression,{});
-	//dn();
-	//prt("} -> " + to_string(x));
-	return AST(x);
+	return a;
 };
+AST parse(const AST& ast) {
+	return parseGroupers(tokenize(ast));
+};
+AST parseGroupers(const AST& tokens) {
+	AST arguments = tokens;
+	AST arguments2;
+
+	bool found = true;
+	size_t start,end;
+	std::string start_c,end_c;
+	while (found) {
+		found = false;
+		for (size_t i = 0; i < arguments.size(); ++i) {
+			if (
+				arguments[i].to_string() == "(" ||
+				arguments[i].to_string() == "{"
+			) {
+				start = i;
+				start_c = arguments[i].to_string();
+			} else if (
+				arguments[i].to_string() == ")" ||
+				arguments[i].to_string() == "}"
+			) {
+				found = true;
+				end = i;
+				end_c = arguments[i].to_string();
+				break;
+			};
+		};
+		if (found) {
+			arguments2.insert(
+				arguments2.end(),
+				arguments.begin(),
+				arguments.begin() + start
+			);
+			if (start + 1 == end) {
+				arguments2.push_back(AST(
+					GROUPER,{},{start_c,end_c}
+				));
+			} else {
+				arguments2.push_back(AST(
+					GROUPER,{
+						parse(AST(
+							arguments.begin() + start + 1,
+							arguments.begin() + end
+						))
+					},{
+						start_c,end_c
+					}
+				));
+			};
+			arguments2.insert(
+				arguments2.begin(),
+				arguments.begin() + end + 1,
+				arguments.end()
+			);
+			arguments = arguments2;
+			arguments2.clear();
+		};
+	};
+	return AST(arguments);
+};
+
 int main() {
-	std::cout << parse("type1 < type2,type1 : #type2,type1 = type2,type1{type2},type1(type2)") << "\n";
+	AST ast = parse(AST("this is a (test)"));
+	std::cout << "THERE" << std::endl;
+	std::cout << ast.repr() << std::endl;
 };
+
+/*
+
+AST(
+	NONE,[
+		AST(NONE,[],["this"]),
+		AST(NONE,[],["is"]),
+		AST(NONE,[],["a"]),
+		AST(
+			GROUPER,[
+				AST(NONE,[],[""])
+			],["(",")"])],[""])
+
+*/
