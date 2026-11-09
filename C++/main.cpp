@@ -24,7 +24,7 @@ AST splitWhitespace(const AST& str) {
 };
 AST tokenize(const AST& ast) {
 	std::string str = ast.to_string();
-	AST a;
+	std::vector<AST> a;
 	std::string item = "";
 	for (size_t i = 0; i < str.length(); ++i) {
 		switch (str[i]) {
@@ -54,7 +54,13 @@ AST tokenize(const AST& ast) {
 				break;
 		};
 	};
-	return a;
+	if (item.length() > 0) {
+		a.push_back(AST(item));
+	};
+	if (a.size() == 1) {
+		return AST(a[0].to_string());
+	};
+	return AST(a);
 };
 AST parse(const AST& ast) {
 	return parseGroupers(tokenize(ast));
@@ -120,9 +126,7 @@ AST parseGroupers(const AST& tokens) {
 };
 
 int main() {
-	AST ast = parse(AST("this is a (test)"));
-	std::cout << "THERE" << std::endl;
-	std::cout << ast.repr() << std::endl;
+	std::cout << parse(AST("this is a (test)")).repr() << std::endl;
 };
 
 /*
@@ -134,7 +138,12 @@ AST(
 		AST(NONE,[],["a"]),
 		AST(
 			GROUPER,[
-				AST(NONE,[],[""])
+				AST(
+					BINARY,
+					[
+						AST(NONE,[],["test"])
+					],[""]
+				)
 			],["(",")"])],[""])
 
 */
