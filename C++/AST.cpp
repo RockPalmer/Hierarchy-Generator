@@ -14,6 +14,8 @@ AST::AST(const std::vector<AST>& arguments):
 	AST(BINARY,arguments,{""}) {};
 AST::AST(const std::vector<AST>::iterator start,const std::vector<AST>::iterator end):
 	AST(std::vector<AST>(start,end)) {};
+AST::AST(const std::vector<AST>::const_iterator start,const std::vector<AST>::const_iterator end):
+	AST(std::vector<AST>(start,end)) {};
 
 size_t AST::size() const {
 	return arguments.size();
@@ -58,26 +60,20 @@ std::string AST::to_string() const {
 std::string AST::repr() const {
 	std::string r = "AST(";
 	switch (type) {
-		case NONE: r += "NONE"; break;
-		case GROUPER: r += "GROUPER"; break;
-		case UNARY: r += "UNARY"; break;
-		case BINARY: r += "BINARY"; break;
+		case NONE: return "NONE(\"" + op[0] + "\")";
+		case GROUPER: return "GROUPER" + op[0] + arguments[0].repr() + op[1];
+		case UNARY: return "UNARY(\"" + op[0] + "\")[" + arguments[0].repr() + "]";
+		case BINARY:
+			r = "BINARY(\"" + op[0] + "\")[";
+			if (arguments.size() > 0) {
+				r += arguments[0].repr();
+			};
+			for (size_t i = 1; i < arguments.size(); ++i) {
+				r += "," + arguments[i].repr();
+			};
+			r += "]";
+			break;
 	};
-	r += ",[";
-	if (arguments.size() > 0) {
-		r += arguments[0].repr();
-	};
-	for (size_t i = 1; i < arguments.size(); ++i) {
-		r += "," + arguments[i].repr();
-	};
-	r += "],[";
-	if (op.size() > 0) {
-		r += "\"" + op[0] + "\"";
-	};
-	for (size_t i = 1; i < op.size(); ++i) {
-		r += ",\"" + op[i] + "\"";
-	};
-	r += "])";
 	return r;
 };
 

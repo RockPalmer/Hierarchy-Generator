@@ -17,6 +17,7 @@ struct AST {
 	AST(const ASTType type,const std::vector<AST>& arguments,const std::vector<std::string>& op);
 	AST(const std::vector<AST>& arguments);
 	AST(const std::vector<AST>::iterator start,const std::vector<AST>::iterator end);
+	AST(const std::vector<AST>::const_iterator start,const std::vector<AST>::const_iterator end);
 
 	size_t size() const;
 
