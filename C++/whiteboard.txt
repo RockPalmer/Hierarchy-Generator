@@ -1,0 +1,19 @@
+Reference = list[Identifier]
+Identifier = {
+	names: list[string],
+	arguments: list[Argument]
+}
+ArgumentType = [
+	BASIC,
+	KEYWORD,
+	LIST,
+	KEYWORD_DELIMITER,
+	LIST_DELIMITER
+]
+Argument = {
+	type: ArgumentType,
+	name: string,
+	default: string,
+	returns: list[Reference],
+	inherits: list[Reference]
+}
