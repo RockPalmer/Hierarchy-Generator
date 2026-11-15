@@ -6,6 +6,8 @@
 #include <iostream>
 #include <regex>
 #include <cctype>
+#include <tuple>
+#include <algorithm>
 
 #include "AST.h"
 #include "Reference.h"
@@ -18,6 +20,16 @@
 
 size_t CURRENT = 0;
 
+std::vector<std::tuple<size_t,bool,bool>> ENTITIES = {
+	{0,false,false}
+};
+std::vector<std::tuple<size_t,std::string>> ENTITY_NAMES;
+std::vectir<std::tuple<size_t,std::string>> DEFAULT_VALUES;
+std::vector<std::tuple<size_t,size_t>> PARENTS;
+std::vector<std::tuple<size_t,size_t>> RETURNS;
+std::vector<std::tuple<size_t,size_t>> ATTRIBUTES;
+std::vector<std::tuple<size_t,size_t,size_t>> ARGUMENTS;
+/*
 std::set<Entity> ENTITIES = {
 	{0,false,false}
 };
@@ -26,6 +38,7 @@ std::set<EntityPair> PARENTS;
 std::set<EntityPair> RETURNS;
 std::set<EntityPair> ATTRIBUTES;
 std::set<EntityArgument> ARGUMENTS;
+*/
 
 int main();
 AST parse(const AST& ast);
@@ -403,73 +416,150 @@ void handleCommand(const std::string value) {
 	command = trim(line.substr(0,index));	
 	arguments = trim(line.substr(index));
 };
-size_t getArgumentAt(const size_t id,const size_t index) {
-	for (const EntityArgument& argument : ARGUMENTS)
-		if (argument.id1 == id && argument.index > max_v)
-			return argument.id2;
+bool hasArguments(const size_t id) {
+	for (const auto& [ entityid , isArgument , hasArguments ] : ENTITIES)
+		if (id == entityid)
+			return hasArguments;
+	return false;
+};
+std::set<std::string> getNames(const size_t id) {
+	std::set<std::string> names;
+	for (const auto& [ entityid , name ] : ENTITY_NAMES)
+		if (id == entityid)
+			names.insert(name);
+	return names;
+};
+size_t getMaxIndex(const size_t id) {
+	size_t max_v = 0;
+	for (const auto& [ entityid , argumentid , index ] : ARGUMENTS)
+		if (max_v < index)
+			max_v = index;
+	return max_v;
+};
+size_t getArgumentIdAt(const size_t id,const size_t index) {
+	for (const auto& [ entityid , argumentid , idx ] : ARGUMENTS)
+		if (entityid == id && idx == index)
+			return argumentid;
 	return std::string::npos;
 };
-std::vector<size_t> getArguments(const size_t id) {
-	size_t max_v = 0;
-	for (const EntityArgument& argument : ARGUMENTS)
-		if (argument.id1 == id && argument.index > max_v)
-			max_v = argument.index;
-	std::vector<size_t> results(max_v + 1);
-	for (size_t i = 0; i <= max_v; ++i)
-		results[i] = getArgumentAt(id,i);
-	return results;
+std::string getName(const size_t id) {
+	for (const auto& [ entityid , name ] : ENTITY_NAMES)
+		if (entityid == id)
+			return name;
+	return "";
 };
-bool hasArguments(const size_t id,const ArgumentList& arguments) {
-	std::vector<size_t> args = getArguments(id);
-	if (arguments.size() != args.size()) return false;
-	for (const size_t i = 0; i < arguments.size(); ++i)
-		if (!argumentMatches(args[i],arguments[i]))
+Reference getReference(const size_t id) {
+	std::vector<Identifier> values = {
+		getIdentifier(id)
+	};
+	if (hasContainer(id)) {
+		size_t containerid = getContainerId(id);
+		if (containerid == 0) {
+			return Reference(values);
+		};
+		Reference ref = getReference(containerid);
+		ref.push_back(values[0]);
+		return ref;
+	};
+	return Reference(values);
+};
+std::set<Reference> getReturnValues(const size_t id) {
+	std::set<Reference> returnValues;
+	for (const auto& [ parentid , childid ] : RETURNS)
+		if (parentid == id)
+			returnValues.insert(getReference(childid));
+	return returnValues;
+};
+std::set<Reference> getParents(const size_t id) {
+	std::set<Reference> parents;
+	for (const auto& [ childid , parentid ] : RETURNS)
+		if (childid == id)
+			parents.insert(getReference(parentid));
+	return parents;
+};
+Argument getArgument(const size_t id) {
+	return Argument(
+		getName(id),
+		getReturnValues(id),
+		getParents(id)
+	);
+};
+std::vector<Argument> getArguments(const size_t id) {
+	size_t numberOfArguments = getMaxIndex(id) + 1;
+	std::vector<size_t> argumentids;
+	for (size_t i = 0; i < numberOfArguments; ++i)
+		argumentids.push_back(getArgumentIdAt(id,i));
+	std::vector<Argument> arguments;
+	for (size_t i = 0; i < numberOfArguments; ++i)
+		arguments.push_back(getArgument(argumentids[i]));
+	return arguments;
+};
+ArgumentList getArgumentList(const size_t id) {
+	return ArgumentList(
+		getArguments(id)
+	);
+};
+Identifier getIdentifier(const size_t id) {
+	if (hasArguments(id))
+		return Identifier(
+			getNames(id),
+			getArgumentList(id)
+		);
+	return Identifier(
+		getNames(id)
+	);
+};
+std::map<size_t,Identifier> getAttributes(const size_t id) {
+	std::map<size_t,Identifier> values;
+	for (const auto& [ containerid , attributeid ] : ATTRIBUTES)
+		if (id == containerid)
+			values[attributeid] = getIdentifier(attributeid);
+	return values;
+};
+bool argumentsMatch(const ArgumentList& arguments1,const ArgumentList& arguments2) {
+	if (arguments1.size() != arguments2.size())
+		return false;
+	for (size_t i = 0; i < arguments1.size(); ++i) {
+		if (arguments1[i].name != arguments2[i].name)
 			return false;
+		if (!std::includes(arguments1.returns.begin(),arguments1.returns.end(),arguments2.returns.begin(),arguments2.returns.end()))
+			return false;
+		if (!std::includes(arguments1.inherits.begin(),arguments1.inherits.end(),arguments2.inherits.begin(),arguments2.inherits.end()))
+			return false;
+	};
 	return true;
 };
-std::set<size_t> getAttributes(const size_t id) {
-	std::set<size_t> results;
-	for (const EntityPair& pair : ATTRIBUTES) {
-		if (pair.id1 == id)
-			results.insert(pair.id2);
+std::set<size_t> getByIdentifier(const size_t id,const Identifier& identifier) {
+	std::map<size_t,Identifier> attrs1 = getAttributes(id);
+	std::map<size_t,Identifier> attrs2;
+	std::set<size_t> ids;
+	for (const auto& [ key , value ] : attrs1)
+		if (std::includes(value.names.begin(),value.names.end(),identifier.names.begin(),identifier.names.end()))
+			attrs2[key] = value;
+	if (!identifier.hasArguments) {
+		if (attrs2.size() == 1)
+			for (const auto& [ key , value ] : attrs2)
+				return key;
+		for (const auto& [ key , value ] : attrs2)
+			ids.insert(key);
+		return ids;
 	};
-	return results;
+	attrs1.clear();
+	for (const auto& [ key , value ] : attrs2)
+		if (value.hasArguments && argumentsMatch(identifier.arguments,value.arguments))
+			attrs1[key] = value;
+	for (const auto& [ key , value ] : attrs1)
+		ids.insert(key);
+	return ids;
 };
-std::set<size_t> getByName(const std::string name,const size_t id) {
-	std::set<size_t> results;
-	for (const size_t attribute_id : getAttributes(id)) {
-		EntityName n(attribute_id,name);
-		if (ENTITY_NAMES.find(n) != ENTITY_NAMES.end())
-			results.insert(attribute_id);
-	};
-	return results;
-};
-std::set<size_t> getByNames(const std::set<std::string>& names,const size_t id) {
-	std::set<size_t> results;
-	for (const std::string name : names)
-		for (const size_t i : getByName(name,id))
-			results.insert(i);
-	return results;
-};
-std::set<size_t> getByIdentifier(const Identifier& identifier,const size_t id) {
-	if (identifier.hasArguments) {
-		std::set<size_t> results;
-		for (const size_t i : getByNames(identifier.names,id))
-			if (hasArguments(i,identifier.arguments))
-				results.insert(i);
-		return results;
-	};
-	return getByName(identifier.name,id);
-};
-std::set<size_t> getByReference(const Reference& reference,const size_t id) {
-	std::set<size_t> ids = getByIdentifier(reference[0],id);
-	if (reference.size() == 1) return ids;
-	std::set<size_t> result;
-	Reference ref = Reference(reference.begin() + 1,reference.end());
-	for (const size_t i : ids)
-		for (const size_t j : getByIdentifier(ref,i))
-			result.insert(j);
-	return result;
+std::set<size_t> getByReference(const size_t id,const Reference& reference) {
+	std::set<size_t> newids = getByIdentifier(id,reference[0]);
+	if (reference.size() > 1)
+		std::set<size_t> ids;
+		for (const size_t newid : newids)
+			for (const size_t i : getByReference(newid,Reference(reference.begin(),reference.end())))
+
+	return newid;
 };
 int main() {
 	Reference ref = Reference({

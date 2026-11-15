@@ -4,35 +4,29 @@
 
 Argument::Argument(const std::string name):
 	Argument(name,{},{}) {};
-Argument::Argument(const std::string name,const std::string defaultValue):
-	Argument(name,defaultValue,{},{}) {};
-Argument::Argument(const std::string name,const std::vector<Reference>& returns,const std::vector<Reference>& inherits):
+Argument::Argument(const std::string name,const std::set<Reference>& returns,const std::set<Reference>& inherits):
 	name(name),
 	hasDefaultValue(false),
-	defaultValue(""),
-	returns(returns),
-	inherits(inherits) {};
-Argument::Argument(const std::string name,const std::string defaultValue,const std::vector<Reference>& returns,const std::vector<Reference>& inherits):
-	name(name),
-	hasDefaultValue(true),
-	defaultValue(defaultValue),
 	returns(returns),
 	inherits(inherits) {};
 
 std::string Argument::to_string() const {
-	std::string result = name;
+	std::string block = "",result = name;
 	if (returns.size() > 0) {
-		result += ":" + returns[0].to_string();
+		result += ":";
 	};
-	for (size_t i = 1; i < returns.size(); ++i) {
-		result += "|" + returns[i].to_string();
+	for (const Reference& r : returns) {
+		block += "|" + r.to_string();
 	};
+	result += block.substr(1);
 	if (inherits.size() > 0) {
-		result += "<" + inherits[0].to_string();
+		result += "<";
 	};
-	for (size_t i = 1; i < inherits.size(); ++i) {
-		result += "&" + inherits[i].to_string();
+	block = "";
+	for (const Reference& r : inherits) {
+		block += "&" + r.to_string();
 	};
+	result += block.substr(1);
 	if (hasDefaultValue) {
 		result += "=" + defaultValue;
 	};
@@ -153,4 +147,23 @@ void Reference::push_back(const Identifier& identifier) {
 };
 void Reference::insert(const std::vector<Identifier>::iterator i1,const std::vector<Identifier>::iterator i2,const std::vector<Identifier>::iterator i3) {
 	values.insert(i1,i2,i3);
+};
+
+bool operator<(const Reference& v1,const Reference& v2) {
+	return v1.to_string() < v2.to_string();
+};
+bool operator<=(const Reference& v1,const Reference& v2) {
+	return v1.to_string() <= v2.to_string();
+};
+bool operator>(const Reference& v1,const Reference& v2) {
+	return v1.to_string() > v2.to_string();
+};
+bool operator>=(const Reference& v1,const Reference& v2) {
+	return v1.to_string() >= v2.to_string();
+};
+bool operator==(const Reference& v1,const Reference& v2) {
+	return v1.to_string() == v2.to_string();
+};
+bool operator!=(const Reference& v1,const Reference& v2) {
+	return v1.to_string() != v2.to_string();
 };

@@ -3,7 +3,7 @@
 
 struct Entity {
 	size_t id;
-	size_t isArgument;
+	bool isArgument;
 	bool hasArguments;
 
 	Entity(const size_t id,const bool isArgument,const bool hasArguments);

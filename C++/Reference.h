@@ -3,20 +3,18 @@
 
 #include <string>
 #include <vector>
+#include <set>
 
 struct Reference;
 
 struct Argument {
 	std::string name;
 	bool hasDefaultValue;
-	std::string defaultValue;
-	std::vector<Reference> returns;
-	std::vector<Reference> inherits;
+	std::set<Reference> returns;
+	std::set<Reference> inherits;
 
 	Argument(const std::string name);
-	Argument(const std::string name,const std::string defaultValue);
-	Argument(const std::string name,const std::vector<Reference>& returns,const std::vector<Reference>& inherits);
-	Argument(const std::string name,const std::string defaultValue,const std::vector<Reference>& returns,const std::vector<Reference>& inherits);
+	Argument(const std::string name,const std::set<Reference>& returns,const std::set<Reference>& inherits);
 
 	std::string to_string() const;
 };
@@ -76,5 +74,12 @@ struct Reference {
 	void push_back(const Identifier& identifier);
 	void insert(const std::vector<Identifier>::iterator i1,const std::vector<Identifier>::iterator i2,const std::vector<Identifier>::iterator i3);
 };
+
+bool operator<(const Reference& v1,const Reference& v2);
+bool operator<=(const Reference& v1,const Reference& v2);
+bool operator>(const Reference& v1,const Reference& v2);
+bool operator>=(const Reference& v1,const Reference& v2);
+bool operator==(const Reference& v1,const Reference& v2);
+bool operator!=(const Reference& v1,const Reference& v2);
 
 #endif
