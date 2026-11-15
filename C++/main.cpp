@@ -516,15 +516,35 @@ std::map<size_t,Identifier> getAttributes(const size_t id) {
 			values[attributeid] = getIdentifier(attributeid);
 	return values;
 };
+bool areDisjoint(const std::set<size_t>& a, const std::set<size_t>& b) {
+    std::vector<size_t> intersection;
+    std::set_intersection(a.begin(),a.end(),b.begin(),b.end(),std::back_inserter(intersection));
+    return intersection.empty();
+};
+bool referenceListContains(const std::set<Reference>& list,const Reference& reference) {
+	std::set<size_t> mainList = getByReference(reference);
+	for (const Reference& ref : list) {
+		std::set<size_t> argList = getByReference(ref);
+		if (!areDisjoint(argList,mainList))
+			return true;
+	};
+	return false;
+};
+bool referenceListIncludes(const std::set<Reference>& list1,const std::set<Reference>& list2) {
+	for (const Reference& reference : list1)
+		if (!referenceListContains(list2,reference))
+			return false;
+	return true;
+};
 bool argumentsMatch(const ArgumentList& arguments1,const ArgumentList& arguments2) {
 	if (arguments1.size() != arguments2.size())
 		return false;
 	for (size_t i = 0; i < arguments1.size(); ++i) {
 		if (arguments1[i].name != arguments2[i].name)
 			return false;
-		if (!std::includes(arguments1.returns.begin(),arguments1.returns.end(),arguments2.returns.begin(),arguments2.returns.end()))
+		if (arguments1[i].returns.size() == 0 || referenceListIncludes(arguments1[i].returns,arguments2[i].returns))
 			return false;
-		if (!std::includes(arguments1.inherits.begin(),arguments1.inherits.end(),arguments2.inherits.begin(),arguments2.inherits.end()))
+		if (arguments1[i].inherits.size() == 0 || referenceListIncludes(arguments1[i].inherits,arguments2[i].inherits))
 			return false;
 	};
 	return true;
@@ -554,12 +574,18 @@ std::set<size_t> getByIdentifier(const size_t id,const Identifier& identifier) {
 };
 std::set<size_t> getByReference(const size_t id,const Reference& reference) {
 	std::set<size_t> newids = getByIdentifier(id,reference[0]);
-	if (reference.size() > 1)
+	if (newids.size() == 0)
+		return getByReference(0,reference);
+	if (reference.size() > 1) {
 		std::set<size_t> ids;
 		for (const size_t newid : newids)
 			for (const size_t i : getByReference(newid,Reference(reference.begin(),reference.end())))
-
-	return newid;
+				ids.insert(i);
+		if (ids.size() == 0)
+			return getByReference(0,reference);
+		return ids;
+	};
+	return newids;
 };
 int main() {
 	Reference ref = Reference({
