@@ -6,7 +6,6 @@ Argument::Argument(const std::string name):
 	Argument(name,{},{}) {};
 Argument::Argument(const std::string name,const std::set<Reference>& returns,const std::set<Reference>& inherits):
 	name(name),
-	hasDefaultValue(false),
 	returns(returns),
 	inherits(inherits) {};
 
@@ -27,9 +26,6 @@ std::string Argument::to_string() const {
 		block += "&" + r.to_string();
 	};
 	result += block.substr(1);
-	if (hasDefaultValue) {
-		result += "=" + defaultValue;
-	};
 	return result;
 };
 

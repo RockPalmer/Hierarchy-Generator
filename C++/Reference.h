@@ -9,7 +9,6 @@ struct Reference;
 
 struct Argument {
 	std::string name;
-	bool hasDefaultValue;
 	std::set<Reference> returns;
 	std::set<Reference> inherits;
 

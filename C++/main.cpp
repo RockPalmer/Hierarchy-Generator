@@ -11,12 +11,8 @@
 
 #include "AST.h"
 #include "Reference.h"
-#include "Entity.h"
-#include "EntityName.h"
-#include "EntityPair.h"
-#include "EntityArgument.h"
 
-// g++ -o main main.cpp AST.cpp Reference.cpp Entity.cpp EntityName.cpp EntityPair.cpp EntityArgument.cpp
+// g++ -o main main.cpp AST.cpp Reference.cpp
 
 size_t CURRENT = 0;
 
@@ -24,7 +20,7 @@ std::vector<std::tuple<size_t,bool,bool>> ENTITIES = {
 	{0,false,false}
 };
 std::vector<std::tuple<size_t,std::string>> ENTITY_NAMES;
-std::vectir<std::tuple<size_t,std::string>> DEFAULT_VALUES;
+std::vector<std::tuple<size_t,std::string>> DEFAULT_VALUES;
 std::vector<std::tuple<size_t,size_t>> PARENTS;
 std::vector<std::tuple<size_t,size_t>> RETURNS;
 std::vector<std::tuple<size_t,size_t>> ATTRIBUTES;
@@ -134,6 +130,7 @@ AST parse(const AST& ast) {
 	a = combine(a);
 	a = parseGroupers(a);
 	a = parseBinary(a,0);
+	a = squash(a);
 	return a;
 };
 bool isName(const AST& value) {
@@ -353,28 +350,35 @@ AST squash(const AST& ast) {
 			if (
 				args1[0].type == BINARY &&
 				args1[0].op.size() == 1 &&
-				args1[0].op[0] == ast.op[0] &&
-				args1[1].type == BINARY &&
-				args1[1].op.size() == 1 &&
-				args1[1].op[0] == ast.op[0]
+				args1[0].op[0] == ast.op[0]
 			) {
 				args2.insert(
 					args2.end(),
 					args1[0].begin(),
 					args1[0].end()
 				);
+			} else {
+				args2.push_back(args1[0]);
+			};
+			if (
+				args1[1].type == BINARY &&
+				args1[1].op.size() == 1 &&
+				args1[1].op[0] == ast.op[0]
+			) {
 				args2.insert(
 					args2.end(),
 					args1[1].begin(),
 					args1[1].end()
 				);
-				args1.clear();
-				args1.insert(
-					args1.end(),
-					args2.begin(),
-					args2.end()
-				);
+			} else {
+				args2.push_back(args1[1]);
 			};
+			args1.clear();
+			args1.insert(
+				args1.end(),
+				args2.begin(),
+				args2.end()
+			);
 			return AST(
 				BINARY,
 				args1,
@@ -416,6 +420,14 @@ void handleCommand(const std::string value) {
 	command = trim(line.substr(0,index));	
 	arguments = trim(line.substr(index));
 };
+//--------------------------------------------------------------------
+void cmd_define(const AST& ast) {
+	if (ast.type == NONE) {
+		std::string name = ast.to_string();
+		define_Entity(ast.to_string())
+	};
+};
+/*
 bool hasArguments(const size_t id) {
 	for (const auto& [ entityid , isArgument , hasArguments ] : ENTITIES)
 		if (id == entityid)
@@ -587,39 +599,11 @@ std::set<size_t> getByReference(const size_t id,const Reference& reference) {
 	};
 	return newids;
 };
+*/
 int main() {
-	Reference ref = Reference({
-		Identifier(
-			"type1",
-			ArgumentList({
-				Argument("/"),
-				Argument("arg1","45"),
-				Argument("arg2",{},{Reference({Identifier("parent1")}),Reference({Identifier("parent2")})}),
-				Argument("arg3",{Reference({Identifier("return1")}),Reference({Identifier("return2")})},{Reference({Identifier("parent1")}),Reference({Identifier("parent2")})})
-			})
-		),
-		Identifier(
-			"type2"
-		)
-	});
-	std::cout << ref.to_string() << std::endl;
+	std::cout << parse(AST("parent.t1.t2(arg).t3")).repr() << std::endl;
 };
 
 /*
-
-BINARY("=")[
-	BINARY("")[
-		UNARY("*")[
-			NONE("a")
-		],
-		GROUPER(
-			NONE("b")
-		)
-	],
-	BINARY(":")[
-		NONE("c"),
-		NONE("d")
-	]
-]
 
 */
