@@ -46,7 +46,9 @@ std::string AST::to_string() const {
 	std::string r;
 	switch (type) {
 		case NONE: return op[0];
-		case GROUPER: return op[0] + arguments[0].to_string() + op[1];
+		case GROUPER: 
+			if (arguments.size() > 0) return op[0] + arguments[0].to_string() + op[1];
+			return op[0] + op[1];
 		case UNARY: return op[0] + arguments[0].to_string();
 		case BINARY:
 			r = arguments[0].to_string();
@@ -61,7 +63,9 @@ std::string AST::repr() const {
 	std::string r = "AST(";
 	switch (type) {
 		case NONE: return "NONE(\"" + op[0] + "\")";
-		case GROUPER: return "GROUPER" + op[0] + arguments[0].repr() + op[1];
+		case GROUPER:
+			if (arguments.size() > 0) return "GROUPER" + op[0] + arguments[0].repr() + op[1];
+			return "GROUPER" + op[0] + op[1];
 		case UNARY: return "UNARY(\"" + op[0] + "\")[" + arguments[0].repr() + "]";
 		case BINARY:
 			r = "BINARY(\"" + op[0] + "\")[";

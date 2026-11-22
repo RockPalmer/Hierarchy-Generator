@@ -14,33 +14,51 @@
 
 // g++ -o main main.cpp AST.cpp Reference.cpp
 
+const std::string PARENT_REFERENCE = "^";
+const std::string TOP_REFERENCE = "~";
+const std::vector<std::string> BINOPS = {
+	",",
+	"=",
+	":",
+	"<",
+	">",
+	"&",
+	"|",
+	"-",
+	">-",
+	"-<",
+	"><",
+	"--",
+	"*",
+	"."
+};
+const std::vector<std::tuple<std::string,std::string>> GROUPING_SYMBOLS = {
+	{"(",")"},
+	{"{","}"}
+};
+const std::vector<std::string> SPECIAL_TOKENS = {
+	PARENT_REFERENCE,
+	TOP_REFERENCE
+};
+
 size_t CURRENT = 0;
 
 std::vector<std::tuple<size_t,bool,bool>> ENTITIES = {
 	{0,false,false}
 };
-std::vector<std::tuple<size_t,std::string>> ENTITY_NAMES;
+std::vector<std::tuple<size_t,std::string>> ENTITY_NAMES = {
+	{0,TOP_REFERENCE}
+};
 std::vector<std::tuple<size_t,std::string>> DEFAULT_VALUES;
 std::vector<std::tuple<size_t,size_t>> PARENTS;
 std::vector<std::tuple<size_t,size_t>> RETURNS;
 std::vector<std::tuple<size_t,size_t>> ATTRIBUTES;
 std::vector<std::tuple<size_t,size_t,size_t>> ARGUMENTS;
-/*
-std::set<Entity> ENTITIES = {
-	{0,false,false}
-};
-std::set<EntityName> ENTITY_NAMES;
-std::set<EntityPair> PARENTS;
-std::set<EntityPair> RETURNS;
-std::set<EntityPair> ATTRIBUTES;
-std::set<EntityArgument> ARGUMENTS;
-*/
 
 int main();
 AST parse(const AST& ast);
 AST parseGroupers(const AST& tokens);
 AST tokenize(const AST& ast);
-AST combine(const AST& ast);
 AST parseBinary(const AST& ast,const size_t index);
 AST parseUnary(const AST& ast);
 AST parseNoSpace(const AST& ast);
@@ -53,6 +71,7 @@ std::string ltrim(const std::string value);
 std::string rtrim(const std::string value);
 std::string trim(const std::string value);
 std::string uppercase(const std::string value);
+void addEntityName(const size_t id,const std::string name);
 void define_Entity(const std::string name);
 void handleCommand(const std::string value);
 size_t tokenMaxLength();
@@ -70,30 +89,6 @@ void up() {
 };
 void dn() {
 	--itera;
-};
-std::vector<std::string> BINOPS = {
-	",",
-	"=",
-	":",
-	"<",
-	">",
-	"&",
-	"|",
-	"-",
-	">-",
-	"-<",
-	"><",
-	"--",
-	"*",
-	"."
-};
-std::vector<std::tuple<std::string,std::string>> GROUPING_SYMBOLS = {
-	{"(",")"},
-	{"{","}"}
-};
-std::vector<std::string> SPECIAL_TOKENS = {
-	"^",
-	"~"
 };
 size_t tokenMaxLength() {
 	size_t max_length_token = 0;
@@ -177,7 +172,6 @@ AST tokenize(const AST& ast) {
 };
 AST parse(const AST& ast) {
 	AST a = tokenize(ast);
-	a = combine(a);
 	a = parseGroupers(a);
 	a = parseBinary(a,0);
 	a = squash(a);
@@ -188,6 +182,9 @@ bool isName(const AST& value) {
 	std::regex pattern2("[a-zA-Z]");
 	std::string str = value.to_string();
 	std::smatch match;
+	for (const std::string& token : SPECIAL_TOKENS)
+		if (token == str)
+			return true;
 	return (
 		std::regex_match(str,match,pattern1) && std::regex_search(str,match,pattern2) ||
 		value.type == GROUPER
@@ -202,25 +199,6 @@ bool isUnaryOperator(const AST& ast) {
 		ast.to_string() == "*" ||
 		ast.to_string() == "**"
 	);
-};
-AST combine(const AST& ast) {
-	if (ast.type != BINARY) {
-		return ast;
-	};
-	std::vector<AST> arguments;
-	for (size_t i = 0; i < ast.size(); ++i) {
-		if (
-			i + 2 < ast.size() &&
-			ast[i].to_string() == "*" &&
-			ast[i + 1].to_string() == "*"
-		) {
-			arguments.push_back(AST("**"));
-			++i;
-		} else {
-			arguments.push_back(ast[i]);
-		};
-	};
-	return AST(arguments);
 };
 AST parseGroupers(const AST& tokens) {
 	AST arguments = tokens;
@@ -347,11 +325,14 @@ AST parseNoSpace(const AST& ast) {
 	std::vector<AST> args;
 	switch (ast.type) {
 		case GROUPER:
-			return AST(
-				GROUPER,
-				{parseNoSpace(ast.arguments[0])},
-				{ast.op[0],ast.op[1]}
-			);
+			if (ast.size() > 0) {
+				return AST(
+					GROUPER,
+					{parseNoSpace(ast.arguments[0])},
+					{ast.op[0],ast.op[1]}
+				);
+			};
+			return ast;
 		case BINARY:
 			if (ast.size() > 2) {
 				for (size_t i = 1; i < ast.size(); ++i) {
@@ -385,13 +366,20 @@ AST squash(const AST& ast) {
 	std::vector<AST> args1,args2;
 	switch (ast.type) {
 		case NONE: return ast;
-		case GROUPER:
 		case UNARY:
 			return AST(
 				ast.type,
 				{squash(ast[0])},
 				ast.op
 			);
+		case GROUPER:
+			if (ast.size() > 0)
+				return AST(
+					ast.type,
+					{squash(ast[0])},
+					ast.op
+				);
+			return ast;
 		case BINARY:
 			args1 = {
 				squash(ast[0]),
@@ -482,8 +470,11 @@ size_t addEntity() {
 	for (const auto [ entityid , isArgument , hasArguments ] : ENTITIES)
 		if (entityid > max_id)
 			max_id = entityid + 1;
-	ENTITIES.emplace_back(max_id);
+	ENTITIES.emplace_back(max_id,false,false);
 	return max_id;
+};
+void addEntityName(const size_t id,const std::string name) {
+	ENTITY_NAMES.emplace_back(id,name);
 };
 void define_Entity(const std::string name) {
 	if (!nameUsed(name)) {
@@ -493,17 +484,18 @@ void define_Entity(const std::string name) {
 };
 void define_equivalence(const std::string name1,const std::string name2) {
 	if (nameUsed(name1) && !nameUsed(name2)) {
-		define_alias(name1,name2);
+		//define_alias(name1,name2);
 	};
 };
 void cmd_define(const AST& ast) {
-	if (ast.type == NONE) {
-		std::string name = ast.to_string();
-		define_Entity(ast.to_string())
+	switch (ast.type) {
+		case NONE: define_Entity(ast.to_string()); break;
+		case BINARY:
+			if (ast.op[0] == ":")
 	};
 };
 int main() {
-	std::cout << parse(AST("parent.t1.t2(arg).t3")).repr() << std::endl;
+	std::cout << parse(AST("type1: type2 = {} < type3")).repr() << std::endl;
 };
 /*
 bool hasArguments(const size_t id) {
