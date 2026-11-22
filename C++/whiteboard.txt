@@ -1,19 +1,11 @@
-Reference = list[Identifier]
-Identifier = {
-	names: list[string],
-	arguments: list[Argument]
-}
-ArgumentType = [
-	BASIC,
-	KEYWORD,
-	LIST,
-	KEYWORD_DELIMITER,
-	LIST_DELIMITER
-]
-Argument = {
-	type: ArgumentType,
-	name: string,
-	default: string,
-	returns: list[Reference],
-	inherits: list[Reference]
-}
+DICTIONARY KEYWORD		: **a
+LIST KEYWORD			: *a
+POSITIONAL_DELIMITER	: /
+KEYWORD_DELIMITER		: *
+UNION					: a | b
+INTERSECTION			: a & b
+DIFFERENCE				: a - b
+INNER JOIN				: a -- b
+LEFT JOIN				: a >- b
+RIGHT JOIN				: a -< b
+INHERITANCE				: a < b

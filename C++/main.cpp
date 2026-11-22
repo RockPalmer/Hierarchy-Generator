@@ -48,11 +48,16 @@ AST squash(const AST& ast);
 bool isName(const std::string value);
 bool containsName(const AST& ast);
 bool isUnaryOperator(const AST& ast);
+bool nameUsed(const std::string name);
 std::string ltrim(const std::string value);
 std::string rtrim(const std::string value);
 std::string trim(const std::string value);
 std::string uppercase(const std::string value);
+void define_Entity(const std::string name);
 void handleCommand(const std::string value);
+size_t tokenMaxLength();
+size_t addEntity();
+std::vector<std::string> tokensOfLength(const size_t length);
 //------------------------------------------------------------------------------
 size_t itera = 0;
 void prt(std::string value) {
@@ -75,45 +80,90 @@ std::vector<std::string> BINOPS = {
 	"&",
 	"|",
 	"-",
+	">-",
+	"-<",
+	"><",
+	"--",
 	"*",
 	"."
+};
+std::vector<std::tuple<std::string,std::string>> GROUPING_SYMBOLS = {
+	{"(",")"},
+	{"{","}"}
+};
+std::vector<std::string> SPECIAL_TOKENS = {
+	"^",
+	"~"
+};
+size_t tokenMaxLength() {
+	size_t max_length_token = 0;
+	for (const std::string& binop : BINOPS)
+		if (binop.length() > max_length_token)
+			max_length_token = binop.length();
+	for (const auto [ left , right ] : GROUPING_SYMBOLS) {
+		if (left.length() > max_length_token)
+			max_length_token = left.length();
+		if (right.length() > max_length_token)
+			max_length_token = right.length();
+	};
+	for (const std::string& token : SPECIAL_TOKENS)
+		if (token.length() > max_length_token)
+			max_length_token = token.length();
+	return max_length_token;
+};
+std::vector<std::string> tokensOfLength(const size_t length) {
+	std::vector<std::string> tokens;
+	for (const std::string& binop : BINOPS)
+		if (binop.length() == length)
+			tokens.push_back(binop);
+	for (const auto [ left , right ] : GROUPING_SYMBOLS) {
+		if (left.length() == length)
+			tokens.push_back(left);
+		if (right.length() == length)
+			tokens.push_back(right);
+	};
+	for (const std::string& token : SPECIAL_TOKENS)
+		if (token.length() == length)
+			tokens.push_back(token);
+	return tokens;
 };
 AST tokenize(const AST& ast) {
 	std::string str = ast.to_string();
 	std::vector<AST> a;
 	std::string item = "";
+	std::vector<std::string> tokens;
+	size_t max_length_token = tokenMaxLength();
+	size_t index = std::string::npos;
 	for (size_t i = 0; i < str.length(); ++i) {
 		switch (str[i]) {
 			case '\t':
 			case '\n':
 			case ' ':
-				if (item.length() > 0) {
+				if (item.length() > 0)
 					a.push_back(AST(item));
-				};
 				item = "";
-				break;
-			case '(':
-			case ')':
-			case '{':
-			case '}':
-			case '=':
-			case ',':
-			case '.':
-			case '&':
-			case '|':
-			case '-':
-			case '*':
-			case '<':
-			case '>':
-			case ':':
-				if (item.length() > 0) {
-					a.push_back(AST(item));
-				};
-				item = "";
-				a.push_back(AST(str[i]));
 				break;
 			default:
-				item += str[i];
+				for (size_t j = max_length_token; j > 0; --j) {
+					tokens = tokensOfLength(j);
+					for (const std::string& token : tokens) {
+						if (str.substr(i,j) == token) {
+							index = j;
+							break;
+						};
+					};
+					if (index != std::string::npos)
+						break;
+				};
+				if (index == std::string::npos)
+					item += str[i];
+				else {
+					if (item.length() > 0)
+						a.push_back(AST(item));
+					item = "";
+					a.push_back(AST(str.substr(i,index)));
+					index = std::string::npos;
+				};
 				break;
 		};
 	};
@@ -421,11 +471,39 @@ void handleCommand(const std::string value) {
 	arguments = trim(line.substr(index));
 };
 //--------------------------------------------------------------------
+bool nameUsed(const std::string name) {
+	for (const auto [ entityid , entityname ] : ENTITY_NAMES)
+		if (name == entityname)
+			return true;
+	return false;
+};
+size_t addEntity() {
+	size_t max_id = 0;
+	for (const auto [ entityid , isArgument , hasArguments ] : ENTITIES)
+		if (entityid > max_id)
+			max_id = entityid + 1;
+	ENTITIES.emplace_back(max_id);
+	return max_id;
+};
+void define_Entity(const std::string name) {
+	if (!nameUsed(name)) {
+		size_t entityid = addEntity();
+		addEntityName(entityid,name);
+	};
+};
+void define_equivalence(const std::string name1,const std::string name2) {
+	if (nameUsed(name1) && !nameUsed(name2)) {
+		define_alias(name1,name2);
+	};
+};
 void cmd_define(const AST& ast) {
 	if (ast.type == NONE) {
 		std::string name = ast.to_string();
 		define_Entity(ast.to_string())
 	};
+};
+int main() {
+	std::cout << parse(AST("parent.t1.t2(arg).t3")).repr() << std::endl;
 };
 /*
 bool hasArguments(const size_t id) {
@@ -599,11 +677,4 @@ std::set<size_t> getByReference(const size_t id,const Reference& reference) {
 	};
 	return newids;
 };
-*/
-int main() {
-	std::cout << parse(AST("parent.t1.t2(arg).t3")).repr() << std::endl;
-};
-
-/*
-
 */
