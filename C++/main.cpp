@@ -66,13 +66,12 @@ AST squash(const AST& ast);
 bool isName(const std::string value);
 bool containsName(const AST& ast);
 bool isUnaryOperator(const AST& ast);
-bool nameUsed(const std::string name);
+bool defined(const std::string name);
 std::string ltrim(const std::string value);
 std::string rtrim(const std::string value);
 std::string trim(const std::string value);
 std::string uppercase(const std::string value);
 void addEntityName(const size_t id,const std::string name);
-void define_Entity(const std::string name);
 void handleCommand(const std::string value);
 size_t tokenMaxLength();
 size_t addEntity();
@@ -459,11 +458,27 @@ void handleCommand(const std::string value) {
 	arguments = trim(line.substr(index));
 };
 //--------------------------------------------------------------------
-bool nameUsed(const std::string name) {
-	for (const auto [ entityid , entityname ] : ENTITY_NAMES)
-		if (name == entityname)
-			return true;
-	return false;
+std::set<size_t> getAttributeIds(const size_t id) {
+	std::set<size_t> ids;
+	for (const auto [ parentid , childid ] : ATTRIBUTES)
+		if (parentid == id)
+			ids.insert(id);
+	return ids;
+};
+std::set<std::string> getNames(const size_t id) {
+	std::set<std::string> names;
+	for (const auto [ entityid , name ] : ENTITY_NAMES)
+		if (entityid == id)
+			names.insert(name);
+	return names;
+};
+bool defined(const size_t id,const Reference& reference) {
+	size_t current = id;
+	char c;
+	for (size_t i = 0; i < reference.size(); ++i) {
+		c = i == 0 ? '.' : reference.ops[i - 1];
+		if (!defined())
+	};
 };
 size_t addEntity() {
 	size_t max_id = 0;
@@ -476,28 +491,46 @@ size_t addEntity() {
 void addEntityName(const size_t id,const std::string name) {
 	ENTITY_NAMES.emplace_back(id,name);
 };
-void define_Entity(const std::string name) {
-	if (!nameUsed(name)) {
-		size_t entityid = addEntity();
-		addEntityName(entityid,name);
-	};
-};
-void define_equivalence(const std::string name1,const std::string name2) {
-	if (nameUsed(name1) && !nameUsed(name2)) {
-		//define_alias(name1,name2);
-	};
-};
 void cmd_define(const AST& ast) {
+	if (ast.type == NONE) {
+		std::string name = ast.to_string();
+		if (!defined(CURRENT,Reference(Identifier(name)))) {
+			size_t entityid = addEntity();
+			addAttribute(CURRENT,entityid);
+			addEntityName(entityid,name);
+		};
+	};
 	switch (ast.type) {
-		case NONE: define_Entity(ast.to_string()); break;
+		case NONE:
+			if (!defined(ast.to)) {
+				size_t entityid = addEntity();
+				addEntityName(entityid,name);
+			};
+			break;
 		case BINARY:
-			if (ast.op[0] == ":")
+			if (ast.op[0] == ".") {
+
+			};
 	};
 };
 int main() {
 	std::cout << parse(AST("type1: type2 = {} < type3")).repr() << std::endl;
 };
 /*
+",",
+"=",
+":",
+"<",
+">",
+"&",
+"|",
+"-",
+">-",
+"-<",
+"><",
+"--",
+"*",
+"."
 bool hasArguments(const size_t id) {
 	for (const auto& [ entityid , isArgument , hasArguments ] : ENTITIES)
 		if (id == entityid)

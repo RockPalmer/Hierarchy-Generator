@@ -52,10 +52,22 @@ struct Identifier {
 
 struct Reference {
 	std::vector<Identifier> values;
+	std::vector<std::string> ops;
 
+	Reference();
+	Reference(const Identifier& value);
 	Reference(const std::vector<Identifier>& values);
-	Reference(const std::vector<Identifier>::iterator start,const std::vector<Identifier>::iterator stop);
-	Reference(const std::vector<Identifier>::const_iterator start,const std::vector<Identifier>::const_iterator stop);
+	Reference(const std::vector<Identifier>& values,const std::vector<char>& ops);
+	Reference(const std::vector<Identifier>& values,const std::vector<char>::iterator startOps,const std::vector<char>::iterator stopOps);
+	Reference(const std::vector<Identifier>& values,const std::vector<char>::const_iterator startOps,const std::vector<char>::const_iterator stopOps);
+	Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals);
+	Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,const std::vector<char>& ops);
+	Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,const std::vector<char>::iterator startOps,const std::vector<char>::iterator stopOps);
+	Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,const std::vector<char>::const_iterator startOps,const std::vector<char>::const_iterator stopOps);
+	Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals);
+	Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const std::vector<char>& ops);
+	Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const std::vector<char>::iterator startOps,const std::vector<char>::iterator stopOps);
+	Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const std::vector<char>::const_iterator startOps,const std::vector<char>::const_iterator stopOps);
 
 	Identifier& operator[](const size_t index);
 	const Identifier& operator[](const size_t index) const;
@@ -71,6 +83,7 @@ struct Reference {
 	std::string to_string() const;
 
 	void push_back(const Identifier& identifier);
+	void push_back(const char op,const Identifier& identifier);
 	void insert(const std::vector<Identifier>::iterator i1,const std::vector<Identifier>::iterator i2,const std::vector<Identifier>::iterator i3);
 };
 
