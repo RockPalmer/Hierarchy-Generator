@@ -30,7 +30,8 @@ const std::vector<std::string> BINOPS = {
 	"><",
 	"--",
 	"*",
-	"."
+	".",
+	"!"
 };
 const std::vector<std::tuple<std::string,std::string>> GROUPING_SYMBOLS = {
 	{"(",")"},
@@ -472,12 +473,17 @@ std::set<std::string> getNames(const size_t id) {
 			names.insert(name);
 	return names;
 };
+bool argumentDefined(const size_t id,)
 bool defined(const size_t id,const Reference& reference) {
 	size_t current = id;
 	char c;
 	for (size_t i = 0; i < reference.size(); ++i) {
 		c = i == 0 ? '.' : reference.ops[i - 1];
-		if (!defined())
+		if (c == '!') {
+			if (!defined(current,reference[i])) return false;
+		} else {
+			return argumentDefined(current,reference[i]);
+		};
 	};
 };
 size_t addEntity() {
