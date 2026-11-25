@@ -68,6 +68,8 @@ std::string ArgumentList::to_string() const {
 	return "(" + result + ")";
 };
 
+Identifier::Identifier():
+	Identifier("") {};
 Identifier::Identifier(const std::string name):
 	hasArguments(false),
 	names{name},
@@ -99,42 +101,36 @@ std::string Identifier::to_string() const {
 	return result;
 };
 
-Reference::Reference() {};
+Reference::Reference():
+	hasArgument(false) {};
 Reference::Reference(const Identifier& value):
-	values{value} {};
+	values{value},
+	hasArgument(false) {};
+Reference::Reference(const Identifier& value,const Identifier& argumentIdentifier):
+	values{value},
+	hasArgument(true),
+	argumentIdentifier(argumentIdentifier) {};
 Reference::Reference(const std::vector<Identifier>& values):
-	Reference(values,std::vector<char>(values.size() - 1,'.')) {};
-Reference::Reference(const std::vector<Identifier>& values,const std::vector<char>& ops):
 	values(values),
-	ops(ops) {};
-Reference::Reference(const std::vector<Identifier>& values,const std::vector<char>::iterator startOps,const std::vector<char>::iterator stopOps):
+	hasArgument(false) {};
+Reference::Reference(const std::vector<Identifier>& values,const Identifier& argumentIdentifier):
 	values(values),
-	ops(startOps,stopOps) {};
-Reference::Reference(const std::vector<Identifier>& values,const std::vector<char>::const_iterator startOps,const std::vector<char>::const_iterator stopOps):
-	values(values),
-	ops(startOps,stopOps) {};
+	hasArgument(true),
+	argumentIdentifier(argumentIdentifier) {};
 Reference::Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals):
-	Reference(startVals,stopVals,std::vector<char>((size_t)(stopVals - startVals),'.')) {};
-Reference::Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,const std::vector<char>& ops):
 	values(startVals,stopVals),
-	ops(ops) {};
-Reference::Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,const std::vector<char>::iterator startOps,const std::vector<char>::iterator stopOps):
+	hasArgument(false) {};
+Reference::Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,const Identifier& argumentIdentifier):
 	values(startVals,stopVals),
-	ops(startOps,stopOps) {};
-Reference::Reference(const std::vector<Identifier>::iterator startVals,const std::vector<Identifier>::iterator stopVals,	const std::vector<char>::const_iterator stopOps):
-	values(startVals,stopVals),
-	ops(startOps,stopOps) {};
+	hasArgument(true),
+	argumentIdentifier(argumentIdentifier) {};
 Reference::Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals):
-	Reference(startVals,stopVals,std::vector<char>((size_t)(stopVals - startVals),'.')) {};
-Reference::Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const std::vector<char>& ops):
 	values(startVals,stopVals),
-	ops(ops) {};
-Reference::Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const std::vector<char>::iterator startOps,const std::vector<char>::iterator stopOps):
+	hasArgument(false) {};
+Reference::Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const Identifier& argumentIdentifier):
 	values(startVals,stopVals),
-	ops(startOps,stopOps) {};
-Reference::Reference(const std::vector<Identifier>::const_iterator startVals,const std::vector<Identifier>::const_iterator stopVals,const std::vector<char>::const_iterator startOps,const std::vector<char>::const_iterator stopOps):
-	values(startVals,stopVals),
-	ops(startOps,stopOps) {};
+	hasArgument(true),
+	argumentIdentifier(argumentIdentifier) {};
 
 Identifier& Reference::operator[](const size_t index) {
 	return values[index];
@@ -163,17 +159,13 @@ std::vector<Identifier>::const_iterator Reference::end() const {
 
 std::string Reference::to_string() const {
 	std::string result = values[0].to_string();
-	for (size_t i = 1; i < size(); ++i) {
-		result += std::string(ops[i - 1]) + values[i].to_string();
-	};
+	for (size_t i = 1; i < size(); ++i)
+		result += "." + values[i].to_string();
+	if (hasArgument)
+		result += "!" + argumentIdentifier.to_string();
 	return result;
 };
 void Reference::push_back(const Identifier& identifier) {
-	push_back('.',identifier);
-};
-void Reference::push_back(const char op,const Identifier& identifier) {
-	if (values.size() > 0)
-		ops.push_back(op);
 	values.push_back(identifier);
 };
 void Reference::insert(const std::vector<Identifier>::iterator i1,const std::vector<Identifier>::iterator i2,const std::vector<Identifier>::iterator i3) {

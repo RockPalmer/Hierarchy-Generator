@@ -4,43 +4,15 @@
 #include <map>
 #include <sstream>
 #include <iostream>
-#include <regex>
 #include <cctype>
 #include <tuple>
 #include <algorithm>
 
 #include "AST.h"
 #include "Reference.h"
+#include "characters.h"
 
-// g++ -o main main.cpp AST.cpp Reference.cpp
-
-const std::string PARENT_REFERENCE = "^";
-const std::string TOP_REFERENCE = "~";
-const std::vector<std::string> BINOPS = {
-	",",
-	"=",
-	":",
-	"<",
-	">",
-	"&",
-	"|",
-	"-",
-	">-",
-	"-<",
-	"><",
-	"--",
-	"*",
-	".",
-	"!"
-};
-const std::vector<std::tuple<std::string,std::string>> GROUPING_SYMBOLS = {
-	{"(",")"},
-	{"{","}"}
-};
-const std::vector<std::string> SPECIAL_TOKENS = {
-	PARENT_REFERENCE,
-	TOP_REFERENCE
-};
+// g++ -o main main.cpp AST.cpp Reference.cpp characters.cpp
 
 size_t CURRENT = 0;
 
@@ -48,7 +20,7 @@ std::vector<std::tuple<size_t,bool,bool>> ENTITIES = {
 	{0,false,false}
 };
 std::vector<std::tuple<size_t,std::string>> ENTITY_NAMES = {
-	{0,TOP_REFERENCE}
+	make_tuple(0,Characters::TOP_REFERENCE)
 };
 std::vector<std::tuple<size_t,std::string>> DEFAULT_VALUES;
 std::vector<std::tuple<size_t,size_t>> PARENTS;
@@ -64,19 +36,24 @@ AST parseBinary(const AST& ast,const size_t index);
 AST parseUnary(const AST& ast);
 AST parseNoSpace(const AST& ast);
 AST squash(const AST& ast);
-bool isName(const std::string value);
 bool containsName(const AST& ast);
-bool isUnaryOperator(const AST& ast);
-bool defined(const std::string name);
+bool canBeReference(const AST& ast);
+bool canBeIdentifier(const AST& ast);
+bool canBeArgumentList(const AST& ast);
+bool canBeArgument(const AST& ast);
+bool canBeNonInheritingArgument(const AST& ast);
+bool canBeNonInstanceArgument(const AST& ast);
+bool canBeUnion(const AST& ast);
+bool canBeIntersection(const AST& ast);
+bool isName(const AST& value);
 std::string ltrim(const std::string value);
 std::string rtrim(const std::string value);
 std::string trim(const std::string value);
 std::string uppercase(const std::string value);
-void addEntityName(const size_t id,const std::string name);
 void handleCommand(const std::string value);
-size_t tokenMaxLength();
+void addEntityName(const size_t id,const std::string name);
+void cmd_define(const AST& ast);
 size_t addEntity();
-std::vector<std::string> tokensOfLength(const size_t length);
 //------------------------------------------------------------------------------
 size_t itera = 0;
 void prt(std::string value) {
@@ -90,44 +67,12 @@ void up() {
 void dn() {
 	--itera;
 };
-size_t tokenMaxLength() {
-	size_t max_length_token = 0;
-	for (const std::string& binop : BINOPS)
-		if (binop.length() > max_length_token)
-			max_length_token = binop.length();
-	for (const auto [ left , right ] : GROUPING_SYMBOLS) {
-		if (left.length() > max_length_token)
-			max_length_token = left.length();
-		if (right.length() > max_length_token)
-			max_length_token = right.length();
-	};
-	for (const std::string& token : SPECIAL_TOKENS)
-		if (token.length() > max_length_token)
-			max_length_token = token.length();
-	return max_length_token;
-};
-std::vector<std::string> tokensOfLength(const size_t length) {
-	std::vector<std::string> tokens;
-	for (const std::string& binop : BINOPS)
-		if (binop.length() == length)
-			tokens.push_back(binop);
-	for (const auto [ left , right ] : GROUPING_SYMBOLS) {
-		if (left.length() == length)
-			tokens.push_back(left);
-		if (right.length() == length)
-			tokens.push_back(right);
-	};
-	for (const std::string& token : SPECIAL_TOKENS)
-		if (token.length() == length)
-			tokens.push_back(token);
-	return tokens;
-};
 AST tokenize(const AST& ast) {
 	std::string str = ast.to_string();
 	std::vector<AST> a;
 	std::string item = "";
 	std::vector<std::string> tokens;
-	size_t max_length_token = tokenMaxLength();
+	size_t max_length_token = Characters::tokenMaxLength();
 	size_t index = std::string::npos;
 	for (size_t i = 0; i < str.length(); ++i) {
 		switch (str[i]) {
@@ -140,7 +85,7 @@ AST tokenize(const AST& ast) {
 				break;
 			default:
 				for (size_t j = max_length_token; j > 0; --j) {
-					tokens = tokensOfLength(j);
+					tokens = Characters::tokensOfLength(j);
 					for (const std::string& token : tokens) {
 						if (str.substr(i,j) == token) {
 							index = j;
@@ -177,27 +122,19 @@ AST parse(const AST& ast) {
 	a = squash(a);
 	return a;
 };
-bool isName(const AST& value) {
-	std::regex pattern1("[a-zA-Z_][a-zA-Z0-9_]*");
-	std::regex pattern2("[a-zA-Z]");
-	std::string str = value.to_string();
-	std::smatch match;
-	for (const std::string& token : SPECIAL_TOKENS)
-		if (token == str)
-			return true;
-	return (
-		std::regex_match(str,match,pattern1) && std::regex_search(str,match,pattern2) ||
-		value.type == GROUPER
-	);
-};
 bool containsName(const AST& ast) {
 	for (const AST& a : ast) if (isName(a)) return true;
 	return false;
 };
-bool isUnaryOperator(const AST& ast) {
+bool isName(const AST& value) {
+	std::string str = value.to_string();
+	std::smatch match;
+	for (const std::string& token : Characters::SPECIAL_TOKENS)
+		if (token == str)
+			return true;
 	return (
-		ast.to_string() == "*" ||
-		ast.to_string() == "**"
+		std::regex_match(str,match,Characters::NAME_PATTERN1) && std::regex_search(str,match,Characters::NAME_PATTERN2) ||
+		value.type == GROUPER
 	);
 };
 AST parseGroupers(const AST& tokens) {
@@ -210,16 +147,10 @@ AST parseGroupers(const AST& tokens) {
 	while (found) {
 		found = false;
 		for (size_t i = 0; i < arguments.size(); ++i) {
-			if (
-				arguments[i].to_string() == "(" ||
-				arguments[i].to_string() == "{"
-			) {
+			if (Characters::isOpenGrouper(arguments[i].to_string())) {
 				start = i;
 				start_c = arguments[i].to_string();
-			} else if (
-				arguments[i].to_string() == ")" ||
-				arguments[i].to_string() == "}"
-			) {
+			} else if (Characters::isCloseGrouper(arguments[i].to_string())) {
 				found = true;
 				end = i;
 				end_c = arguments[i].to_string();
@@ -265,13 +196,13 @@ AST parseGroupers(const AST& tokens) {
 	return AST(arguments);
 };
 AST parseBinary(const AST& ast,const size_t index) {
-	if (index >= BINOPS.size()) {
+	if (index >= Characters::BINOPS.size()) {
 		return parseNoSpace(ast);
 	};
-	for (size_t idx = index; idx < BINOPS.size(); ++idx) {
+	for (size_t idx = index; idx < Characters::BINOPS.size(); ++idx) {
 		for (size_t i = 0; i < ast.size(); ++i) {
 			if (
-				ast[i].to_string() == BINOPS[idx] &&
+				ast[i].to_string() == Characters::BINOPS[idx] &&
 				i > 0 &&
 				i < ast.size() - 1 &&
 				containsName(AST(ast.begin(),ast.begin() + i)) &&
@@ -301,7 +232,7 @@ AST parseBinary(const AST& ast,const size_t index) {
 AST parseUnary(const AST& ast) {
 	for (size_t i = 0; i < ast.size(); ++i) {
 		if (
-			isUnaryOperator(ast[i].to_string()) &&
+			Characters::isUnaryOperator(ast[i].to_string()) &&
 			i < ast.size() - 1 &&
 			containsName(AST(ast.begin() + i + 1,ast.end()))
 		) {
@@ -353,7 +284,7 @@ AST parseNoSpace(const AST& ast) {
 						return AST(
 							BINARY,
 							args,
-							{""}
+							{Characters::ARGUMENT_OPERATOR}
 						);
 					};
 				};
@@ -459,32 +390,139 @@ void handleCommand(const std::string value) {
 	arguments = trim(line.substr(index));
 };
 //--------------------------------------------------------------------
-std::set<size_t> getAttributeIds(const size_t id) {
-	std::set<size_t> ids;
-	for (const auto [ parentid , childid ] : ATTRIBUTES)
-		if (parentid == id)
-			ids.insert(id);
-	return ids;
-};
-std::set<std::string> getNames(const size_t id) {
-	std::set<std::string> names;
-	for (const auto [ entityid , name ] : ENTITY_NAMES)
-		if (entityid == id)
-			names.insert(name);
-	return names;
-};
-bool argumentDefined(const size_t id,)
-bool defined(const size_t id,const Reference& reference) {
-	size_t current = id;
-	char c;
-	for (size_t i = 0; i < reference.size(); ++i) {
-		c = i == 0 ? '.' : reference.ops[i - 1];
-		if (c == '!') {
-			if (!defined(current,reference[i])) return false;
-		} else {
-			return argumentDefined(current,reference[i]);
-		};
+bool canBeReference(const AST& ast) {
+	if (canBeIdentifier(ast)) return true;
+	if (
+		ast.type == GROUPER &&
+		ast.size() > 0 &&
+		ast.op.size() == 2 &&
+		ast.op[0] == Characters::GENERAL_OPEN &&
+		ast.op[1] == Characters::GENERAL_CLOSE
+	) return canBeReference(ast[0]);
+	if (ast.type != BINARY || ast.size() < 2 || ast.op.size() != 1) return false;
+	if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
+		for (const AST& a : ast) if (!canBeIdentifier(a)) return false;
+		return true;
 	};
+	if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER && ast.size() == 2) return canBeReference(ast[0]) && canBeIdentifier(ast[1]);
+	return false;
+};
+bool canBeIdentifier(const AST& ast) {
+	if (canBeNameList(ast)) return true;
+	if (
+		ast.type == GROUPER &&
+		ast.size() > 0 &&
+		ast.op.size() == 2 &&
+		ast.op[0] == Characters::GENERAL_OPEN &&
+		ast.op[1] == Characters::GENERAL_CLOSE
+	) return canBeIdentifier(ast[0]);
+	return (
+		ast.type == BINARY &&
+		ast.op.size() == 1 &&
+		ast.size() == 2 &&
+		ast.op[0] == Characters::ARGUMENT_OPERATOR &&
+		canBeNameList(ast[0]) &&
+		canBeArgumentList(ast[1])
+	);
+};
+bool canBeNameList(const AST& ast) {
+	if (canBeName(ast)) return true;
+	if (ast.type == GROUPER && ast.op[0] == Characters::GENERAL_OPEN && ast.op[1] == Characters::GENERAL_OPEN) return canBeNameList(ast[0]);
+	if (ast.type != BINARY || ast.op[0] != Characters::GENERAL_DELIMITER) return false;
+	for (const AST& a : ast) if (!canBeName(ast)) return false;
+	return true;
+};
+bool canBeName(const AST& ast) {
+	if (ast.type == NONE) return Characters::canBeName(ast.to_string())
+	if (
+		ast.type == GROUPER &&
+		ast.size() == 1 &&
+		ast.op.size() == 2 &&
+		ast.op[0] == Characters::GENERAL_OPEN &&
+		ast.op[0] == Characters::GENERAL_CLOSE
+	) return canBeName(ast[0]);
+	return false;
+};
+bool canBeArgumentList(const AST& ast) {
+	if (ast.type != GROUPER || ast.op[0] != Characters::ARGUMENT_LIST_OPEN || ast.op[1] != Characters::ARGUMENT_LIST_CLOSE) return false;
+	if (ast.size() == 0 || canBeArgument(Ast[0])) return true;
+	if (ast[0].type == GROUPER) return canBeArgumentList(ast[0]);
+	if (ast[0].type == BINARY && ast.op[0] == Characters::GENERAL_DELIMITER) {
+		for (const AST& a : ast) if (!canBeArgument(a)) return false;
+		return true;
+	};
+	return canBeArgument(ast[0]);
+};
+bool canBeArgument(const AST& ast) {
+	if (canBeNonInheritingArgument(ast)) return true;
+	if (ast.type == NONE) return ast.to_string() == Characters::POSITIONAL_DELIMITER || ast.to_string() == Characters::KEYWORD_DELIMITER;
+	if (ast.type == BINARY || ast.size() == 2 && ast.op[0] == Characters::INHERIT_OPERATOR) return (
+		canBeNonInheritingArgument(ast[0]) && (
+			canBeIntersection(ast[1]) ||
+			canBeReference(ast[1])
+		)
+	);
+	return false;
+};
+bool canBeNonInheritingArgument(const AST& ast) {
+	if (canBeNonInstanceArgument(ast)) return true;
+	if (ast.type == BINARY && ast.size() == 2 && ast.op[0] == Characters::INSTANCE_OPERATOR) return (
+		canBeNonInstanceArgument(ast[0]) && (
+			canBeIntersection(ast[1]) ||
+			canBeReference(ast[1])
+		)
+	);
+	return false;
+};
+bool canBeNonInstanceArgument(const AST& ast) {
+	return (
+		ast.type == NONE && Characters::canBeName(ast) ||
+		ast.type == UNARY && Characters::canBeName(ast[0])
+	)
+};
+bool canBeUnion(const AST& ast) {
+	if (ast.type != BINARY || ast.op[0] != Characters::UNION_OPERATOR) return false;
+	for (const AST& a : ast) if (!canBeReference(a)) return false;
+	return true;
+};
+bool canBeIntersection(const AST& ast) {
+	if (ast.type != BINARY || ast.op[0] != Characters::INTERSECTION_OPERATOR) return false;
+	for (const AST& a : ast) if (!canBeReference(a)) return false;
+	return true;
+};
+Reference ASTtoReference(const AST& ast) {
+	if (
+		ast.type == NONE || 
+		ast.type == BINARY && (
+			ast.op[0] == Characters::GENERAL_DELIMITER ||
+			ast.op[0] == Characters::ARGUMENT_OPERATOR
+		)
+	) return Reference(ASTtoIdentifier(ast));
+	if (ast.type == GROUPER && ast.size() > 0) return ASTtoReference(ast[0]);
+	if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
+		Reference ref;
+		for (const AST& a : ast) {
+			ref.push_back(ASTtoIdentifier(a));
+		};
+		return ref;
+	};
+	if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER && ast.size() == 2) {
+		Reference ref = ASTtoReference(ast[0]);
+		return Reference(ref.values,ASTtoIdentifier(ast[1]));
+	};
+	Reference ref;
+	return ref;
+};
+Identifier ASTtoIdentifier(const Identifier& identifier) {
+	if (ast.type == NONE) return Identifier(ast.to_string());
+	if (ast.type == GROUPER && ast.size() > 0) return ASTtoIdentifier(ast[0]);
+	return (
+		ast.type == BINARY &&
+		ast.op.size() == 1 &&
+		ast.op[0] == Characters::ARGUMENT_OPERATOR &&
+		ast[0].type == NONE &&
+		canBeArgumentList(ast[1])
+	);
 };
 size_t addEntity() {
 	size_t max_id = 0;
@@ -500,43 +538,36 @@ void addEntityName(const size_t id,const std::string name) {
 void cmd_define(const AST& ast) {
 	if (ast.type == NONE) {
 		std::string name = ast.to_string();
-		if (!defined(CURRENT,Reference(Identifier(name)))) {
+		if (canBeName(name) && !defined(CURRENT,name)) {
 			size_t entityid = addEntity();
-			addAttribute(CURRENT,entityid);
 			addEntityName(entityid,name);
 		};
-	};
-	switch (ast.type) {
-		case NONE:
-			if (!defined(ast.to)) {
-				size_t entityid = addEntity();
-				addEntityName(entityid,name);
-			};
-			break;
-		case BINARY:
-			if (ast.op[0] == ".") {
+	} else if (ast.type == BINARY) {
+		if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
+			if (canBeReference(ast)) {
 
 			};
+		} else if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER) {
+			// Define attribute with identifier
+		} else if (ast.op[0] == Characters::INHERIT_OPERATOR) {
+			// Define attribute with identifier
+		} else if (ast.op[0] == Characters::BEQUEATH_OPERATOR) {
+			// Define attribute with identifier
+		} else if (ast.op[0] == Characters::INSTANCE_OPERATOR) {
+
+		} else if (ast.op[0] == Characters::EQUALITY_OPERATOR) {
+			
+		} else if (ast.op[0] == Characters::GENERAL_DELIMITER) {
+			
+		} else if (ast.op[0] == Characters::ARGUMENT_OPERATOR) {
+			
+		};
 	};
 };
 int main() {
 	std::cout << parse(AST("type1: type2 = {} < type3")).repr() << std::endl;
 };
 /*
-",",
-"=",
-":",
-"<",
-">",
-"&",
-"|",
-"-",
-">-",
-"-<",
-"><",
-"--",
-"*",
-"."
 bool hasArguments(const size_t id) {
 	for (const auto& [ entityid , isArgument , hasArguments ] : ENTITIES)
 		if (id == entityid)
