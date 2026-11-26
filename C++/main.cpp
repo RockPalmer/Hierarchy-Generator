@@ -14,7 +14,9 @@
 
 // g++ -o main main.cpp AST.cpp Reference.cpp characters.cpp
 
-size_t CURRENT = 0;
+size_t TOP = 0;
+
+size_t CURRENT = TOP;
 
 std::vector<std::tuple<size_t,bool,bool>> ENTITIES = {
 	{0,false,false}
@@ -36,16 +38,18 @@ AST parseBinary(const AST& ast,const size_t index);
 AST parseUnary(const AST& ast);
 AST parseNoSpace(const AST& ast);
 AST squash(const AST& ast);
-bool containsName(const AST& ast);
-bool canBeReference(const AST& ast);
-bool canBeIdentifier(const AST& ast);
-bool canBeArgumentList(const AST& ast);
-bool canBeArgument(const AST& ast);
-bool canBeNonInheritingArgument(const AST& ast);
-bool canBeNonInstanceArgument(const AST& ast);
-bool canBeUnion(const AST& ast);
-bool canBeIntersection(const AST& ast);
-bool isName(const AST& value);
+bool containsObject(const AST& ast);
+bool isReference(const AST& ast);
+bool isIdentifier(const AST& ast);
+bool isArgumentList(const AST& ast);
+bool isArgument(const AST& ast);
+bool isNonInheritingArgument(const AST& ast);
+bool isNonInstanceArgument(const AST& ast);
+bool isUnion(const AST& ast);
+bool isIntersection(const AST& ast);
+bool isObject(const AST& value);
+bool isNameList(const AST& ast);
+bool isName(const AST& ast);
 std::string ltrim(const std::string value);
 std::string rtrim(const std::string value);
 std::string trim(const std::string value);
@@ -122,11 +126,11 @@ AST parse(const AST& ast) {
 	a = squash(a);
 	return a;
 };
-bool containsName(const AST& ast) {
-	for (const AST& a : ast) if (isName(a)) return true;
+bool containsObject(const AST& ast) {
+	for (const AST& a : ast) if (isObject(a)) return true;
 	return false;
 };
-bool isName(const AST& value) {
+bool isObject(const AST& value) {
 	std::string str = value.to_string();
 	std::smatch match;
 	for (const std::string& token : Characters::SPECIAL_TOKENS)
@@ -205,8 +209,8 @@ AST parseBinary(const AST& ast,const size_t index) {
 				ast[i].to_string() == Characters::BINOPS[idx] &&
 				i > 0 &&
 				i < ast.size() - 1 &&
-				containsName(AST(ast.begin(),ast.begin() + i)) &&
-				containsName(AST(ast.begin() + i + 1,ast.end()))
+				containsObject(AST(ast.begin(),ast.begin() + i)) &&
+				containsObject(AST(ast.begin() + i + 1,ast.end()))
 			) {
 				std::vector<AST> args;
 				if (i == 1) {
@@ -234,7 +238,7 @@ AST parseUnary(const AST& ast) {
 		if (
 			Characters::isUnaryOperator(ast[i].to_string()) &&
 			i < ast.size() - 1 &&
-			containsName(AST(ast.begin() + i + 1,ast.end()))
+			containsObject(AST(ast.begin() + i + 1,ast.end()))
 		) {
 			std::vector<AST> args;
 			if (i == ast.size() - 2) {
@@ -268,8 +272,8 @@ AST parseNoSpace(const AST& ast) {
 			if (ast.size() > 2) {
 				for (size_t i = 1; i < ast.size(); ++i) {
 					if (
-						containsName(AST(ast.begin(),ast.begin() + i)) &&
-						containsName(AST(ast.begin() + i,ast.end()))
+						containsObject(AST(ast.begin(),ast.begin() + i)) &&
+						containsObject(AST(ast.begin() + i,ast.end()))
 					) {
 						if (i == 1) {
 							args.push_back(parseNoSpace(ast[0]));
@@ -390,139 +394,167 @@ void handleCommand(const std::string value) {
 	arguments = trim(line.substr(index));
 };
 //--------------------------------------------------------------------
-bool canBeReference(const AST& ast) {
-	if (canBeIdentifier(ast)) return true;
+bool isReference(const AST& ast) {
+	if (isIdentifier(ast)) return true;
 	if (
 		ast.type == GROUPER &&
 		ast.size() > 0 &&
 		ast.op.size() == 2 &&
 		ast.op[0] == Characters::GENERAL_OPEN &&
 		ast.op[1] == Characters::GENERAL_CLOSE
-	) return canBeReference(ast[0]);
+	) return isReference(ast[0]);
 	if (ast.type != BINARY || ast.size() < 2 || ast.op.size() != 1) return false;
 	if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
-		for (const AST& a : ast) if (!canBeIdentifier(a)) return false;
+		for (const AST& a : ast) if (!isIdentifier(a)) return false;
 		return true;
 	};
-	if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER && ast.size() == 2) return canBeReference(ast[0]) && canBeIdentifier(ast[1]);
+	if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER && ast.size() == 2) return isReference(ast[0]) && isIdentifier(ast[1]);
 	return false;
 };
-bool canBeIdentifier(const AST& ast) {
-	if (canBeNameList(ast)) return true;
+bool isIdentifier(const AST& ast) {
+	if (isNameList(ast)) return true;
 	if (
 		ast.type == GROUPER &&
 		ast.size() > 0 &&
 		ast.op.size() == 2 &&
 		ast.op[0] == Characters::GENERAL_OPEN &&
 		ast.op[1] == Characters::GENERAL_CLOSE
-	) return canBeIdentifier(ast[0]);
+	) return isIdentifier(ast[0]);
 	return (
 		ast.type == BINARY &&
 		ast.op.size() == 1 &&
 		ast.size() == 2 &&
 		ast.op[0] == Characters::ARGUMENT_OPERATOR &&
-		canBeNameList(ast[0]) &&
-		canBeArgumentList(ast[1])
+		isNameList(ast[0]) &&
+		isArgumentList(ast[1])
 	);
 };
-bool canBeNameList(const AST& ast) {
-	if (canBeName(ast)) return true;
-	if (ast.type == GROUPER && ast.op[0] == Characters::GENERAL_OPEN && ast.op[1] == Characters::GENERAL_OPEN) return canBeNameList(ast[0]);
+bool isNameList(const AST& ast) {
+	if (isName(ast)) return true;
+	if (ast.type == GROUPER && ast.op[0] == Characters::GENERAL_OPEN && ast.op[1] == Characters::GENERAL_OPEN) return isNameList(ast[0]);
 	if (ast.type != BINARY || ast.op[0] != Characters::GENERAL_DELIMITER) return false;
-	for (const AST& a : ast) if (!canBeName(ast)) return false;
+	for (const AST& a : ast) if (!isName(ast)) return false;
 	return true;
 };
-bool canBeName(const AST& ast) {
-	if (ast.type == NONE) return Characters::canBeName(ast.to_string())
+bool isName(const AST& ast) {
+	if (ast.type == NONE) return Characters::isName(ast.to_string())
 	if (
 		ast.type == GROUPER &&
 		ast.size() == 1 &&
 		ast.op.size() == 2 &&
 		ast.op[0] == Characters::GENERAL_OPEN &&
 		ast.op[0] == Characters::GENERAL_CLOSE
-	) return canBeName(ast[0]);
+	) return isName(ast[0]);
 	return false;
 };
-bool canBeArgumentList(const AST& ast) {
+bool isArgumentList(const AST& ast) {
 	if (ast.type != GROUPER || ast.op[0] != Characters::ARGUMENT_LIST_OPEN || ast.op[1] != Characters::ARGUMENT_LIST_CLOSE) return false;
-	if (ast.size() == 0 || canBeArgument(Ast[0])) return true;
-	if (ast[0].type == GROUPER) return canBeArgumentList(ast[0]);
+	if (ast.size() == 0 || isArgument(Ast[0])) return true;
+	if (ast[0].type == GROUPER) return isArgumentList(ast[0]);
 	if (ast[0].type == BINARY && ast.op[0] == Characters::GENERAL_DELIMITER) {
-		for (const AST& a : ast) if (!canBeArgument(a)) return false;
+		for (const AST& a : ast) if (!isArgument(a)) return false;
 		return true;
 	};
-	return canBeArgument(ast[0]);
+	return isArgument(ast[0]);
 };
-bool canBeArgument(const AST& ast) {
-	if (canBeNonInheritingArgument(ast)) return true;
+bool isArgument(const AST& ast) {
+	if (isNonInheritingArgument(ast)) return true;
 	if (ast.type == NONE) return ast.to_string() == Characters::POSITIONAL_DELIMITER || ast.to_string() == Characters::KEYWORD_DELIMITER;
 	if (ast.type == BINARY || ast.size() == 2 && ast.op[0] == Characters::INHERIT_OPERATOR) return (
-		canBeNonInheritingArgument(ast[0]) && (
-			canBeIntersection(ast[1]) ||
-			canBeReference(ast[1])
+		isNonInheritingArgument(ast[0]) && (
+			isIntersection(ast[1]) ||
+			isReference(ast[1])
 		)
 	);
 	return false;
 };
-bool canBeNonInheritingArgument(const AST& ast) {
-	if (canBeNonInstanceArgument(ast)) return true;
+bool isNonInheritingArgument(const AST& ast) {
+	if (isNonInstanceArgument(ast)) return true;
 	if (ast.type == BINARY && ast.size() == 2 && ast.op[0] == Characters::INSTANCE_OPERATOR) return (
-		canBeNonInstanceArgument(ast[0]) && (
-			canBeIntersection(ast[1]) ||
-			canBeReference(ast[1])
+		isNonInstanceArgument(ast[0]) && (
+			isIntersection(ast[1]) ||
+			isReference(ast[1])
 		)
 	);
 	return false;
 };
-bool canBeNonInstanceArgument(const AST& ast) {
+bool isNonInstanceArgument(const AST& ast) {
 	return (
-		ast.type == NONE && Characters::canBeName(ast) ||
-		ast.type == UNARY && Characters::canBeName(ast[0])
+		ast.type == NONE && Characters::isName(ast) ||
+		ast.type == UNARY && Characters::isName(ast[0])
 	)
 };
-bool canBeUnion(const AST& ast) {
+bool isUnion(const AST& ast) {
 	if (ast.type != BINARY || ast.op[0] != Characters::UNION_OPERATOR) return false;
-	for (const AST& a : ast) if (!canBeReference(a)) return false;
+	for (const AST& a : ast) if (!isReference(a)) return false;
 	return true;
 };
-bool canBeIntersection(const AST& ast) {
+bool isIntersection(const AST& ast) {
 	if (ast.type != BINARY || ast.op[0] != Characters::INTERSECTION_OPERATOR) return false;
-	for (const AST& a : ast) if (!canBeReference(a)) return false;
+	for (const AST& a : ast) if (!isReference(a)) return false;
 	return true;
 };
-Reference ASTtoReference(const AST& ast) {
-	if (
-		ast.type == NONE || 
-		ast.type == BINARY && (
-			ast.op[0] == Characters::GENERAL_DELIMITER ||
-			ast.op[0] == Characters::ARGUMENT_OPERATOR
-		)
-	) return Reference(ASTtoIdentifier(ast));
-	if (ast.type == GROUPER && ast.size() > 0) return ASTtoReference(ast[0]);
-	if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
-		Reference ref;
-		for (const AST& a : ast) {
-			ref.push_back(ASTtoIdentifier(a));
-		};
-		return ref;
-	};
-	if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER && ast.size() == 2) {
-		Reference ref = ASTtoReference(ast[0]);
-		return Reference(ref.values,ASTtoIdentifier(ast[1]));
-	};
-	Reference ref;
-	return ref;
+size_t getContainerId(const size_t id) {
+	for (const auto& [ containerId : attributeId ] : ATTRIBUTES) if (id == attributeId) return containerId;
+	return std::string::npos;
 };
-Identifier ASTtoIdentifier(const Identifier& identifier) {
-	if (ast.type == NONE) return Identifier(ast.to_string());
-	if (ast.type == GROUPER && ast.size() > 0) return ASTtoIdentifier(ast[0]);
-	return (
-		ast.type == BINARY &&
-		ast.op.size() == 1 &&
-		ast.op[0] == Characters::ARGUMENT_OPERATOR &&
-		ast[0].type == NONE &&
-		canBeArgumentList(ast[1])
-	);
+std::set<size_t> getEntityIdsByName(const size_t id,const std::string name) {
+	std::set<size_t> ids;
+	for (const auto& [ entityid , n ] : ENTITY_NAMES) if (entityid == id) ids.insert(entityid);
+	return ids;
+};
+size_t getNumberArguments(const size_t id) {
+	const size_t max = 0;
+	for (const auto& [ entityid , argumentid , index ] : ARGUMENTS) {
+		if (id == entityid && index > max) max = index;
+	};
+	return max + 1;
+};
+std::vector<AST> getArgumentsFromAST(const AST& ast) {
+	std::vector<AST> args;
+	if (ast.size() == 0) return args;
+	if (ast[0].type == GROUPER) return getArgumentsFromAST(ast[0]);
+	if (ast[0].type == BINARY && ast[0].op.size() == 1 && ast[0].op[0] == ",") {
+		args = ast[0].arguments;
+	};
+	return args;
+};
+size_t getArgumentId(const size_t id,const size_t index) {
+	for (const auto& [ entityid , argumentid , idx ] : ARGUMENTS) if (id == entityid && index == idx) return argumentid;
+	return std::string::npos;
+};
+std::set<std::string> getEntityNames(const size_t id) {
+	std::set<std::string> names;
+	for (const auto& [ entityid , name ] : ENTITY_NAMES) if (id == entityid) names.insert(name);
+	return names;
+};
+size_t getAttributeId(const size_t containerId,const AST& ast) {
+	if (ast.type == NONE) {
+		std::string name = ast.to_string();
+		if (name == Characters::TOP_REFERENCE) return TOP;
+		if (name == Characters::PARENT_REFERENCE) return getContainerId(containerId);
+		std::set<size_t> ids = getEntityIdsByName(containerId,name);
+		return *ids.begin();
+	};
+	if (ast.type == GROUPER) return getAttributeId(containerId,ast[0]);
+	if (ast.op[0] == Characters::ARGUMENT_OPERATOR) {
+		std::string name = ast[0].to_string();
+		std::vector<AST> argumentList = getArgumentsFromAST(ast[1]);
+		std::set<size_t> entityIds = getEntityIdsByName(containerId,name);
+		std::map<size_t,std::vector<size_t>> argumentIds;
+		for (const size_t id : entityIds) {
+			size_t numargs = getNumberArguments(id);
+			if (numargs == argumentList.size())
+				argumentIds[id] = std::vector<std::string>(numargs,"");
+		};
+		entityIds.clear();
+		for (const auto& [ key , value ] : argumentIds) {
+			entityIds.push_back(key);
+		};
+		for (const size_t id : entityIds) for (size_t i = 0; i < argumentIds[id].size(); ++i) argumentIds[id][i] = getArgumentId(id,i);
+		for (const auto& [])
+
+	};
 };
 size_t addEntity() {
 	size_t max_id = 0;
@@ -538,14 +570,24 @@ void addEntityName(const size_t id,const std::string name) {
 void cmd_define(const AST& ast) {
 	if (ast.type == NONE) {
 		std::string name = ast.to_string();
-		if (canBeName(name) && !defined(CURRENT,name)) {
+		if (isName(name) && !defined(CURRENT,name)) {
 			size_t entityid = addEntity();
 			addEntityName(entityid,name);
 		};
 	} else if (ast.type == BINARY) {
 		if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
-			if (canBeReference(ast)) {
-
+			if (isReference(ast)) {
+				Identifier identifier = ast[ast.size() - 1];
+				AST a = AST(ast.begin(),ast.end() - 1);
+				if (a.size() == 1 && defined(CURRENT,a[0])) {
+					size_t containerId = getAttributeId(CURRENT,a[0]);
+					size_t entityId = addEntity();
+					setAsAttribute(containerId,entityId);
+				} else if (a.size() > 1 && defined(CURRENT,a)) {
+					size_t containerId = getAttributeId(CURRENT,a);
+					size_t entityId = addEntity();
+					setAsAttribute(containerId,entityId);
+				};
 			};
 		} else if (ast.op[0] == Characters::ARGUMENT_REFERENCE_DELIMITER) {
 			// Define attribute with identifier
