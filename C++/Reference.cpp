@@ -29,6 +29,9 @@ std::string Argument::to_string() const {
 	return result;
 };
 
+ArgumentList::ArgumentList() {};
+ArgumentList::ArgumentList(const Argument& argument):
+	values{argument} {};
 ArgumentList::ArgumentList(const std::vector<Argument>& values):
 	values(values) {};
 
@@ -74,7 +77,7 @@ Identifier::Identifier(const std::string name):
 	hasArguments(false),
 	names{name},
 	arguments({}) {};
-Identifier::Identifier(const std::vector<std::string>& names):
+Identifier::Identifier(const std::set<std::string>& names):
 	hasArguments(false),
 	names(names),
 	arguments({}) {};
@@ -82,16 +85,17 @@ Identifier::Identifier(const std::string name,const ArgumentList& arguments):
 	hasArguments(true),
 	names{name},
 	arguments(arguments) {};
-Identifier::Identifier(const std::vector<std::string>& names,const ArgumentList& arguments):
+Identifier::Identifier(const std::set<std::string>& names,const ArgumentList& arguments):
 	hasArguments(true),
 	names(names),
 	arguments(arguments) {};
 
 std::string Identifier::to_string() const {
-	std::string result = names[0];
-	for (size_t i = 1; i < names.size(); ++i) {
-		result += "," + names[i];
+	std::string result = "";
+	for (const std::string name : names) {
+		result += "," + name;
 	};
+	result = result.substr(1);
 	if (names.size() > 1) {
 		result = "(" + result + ")";
 	};
@@ -103,6 +107,8 @@ std::string Identifier::to_string() const {
 
 Reference::Reference():
 	hasArgument(false) {};
+Reference::Reference(const Reference& reference,const Identifier& argumentIdentifier):
+	Reference(reference.values,argumentIdentifier) {};
 Reference::Reference(const Identifier& value):
 	values{value},
 	hasArgument(false) {};

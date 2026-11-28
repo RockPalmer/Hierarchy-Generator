@@ -24,6 +24,8 @@ struct Argument {
 struct ArgumentList {
 	std::vector<Argument> values;
 
+	ArgumentList();
+	ArgumentList(const Argument& argument);
 	ArgumentList(const std::vector<Argument>& values);
 
 	Argument& operator[](const size_t index);
@@ -42,14 +44,14 @@ struct ArgumentList {
 
 struct Identifier {
 	bool hasArguments;
-	std::vector<std::string> names;
+	std::set<std::string> names;
 	ArgumentList arguments;
 
 	Identifier();
 	Identifier(const std::string name);
-	Identifier(const std::vector<std::string>& names);
+	Identifier(const std::set<std::string>& names);
 	Identifier(const std::string name,const ArgumentList& arguments);
-	Identifier(const std::vector<std::string>& names,const ArgumentList& arguments);
+	Identifier(const std::set<std::string>& names,const ArgumentList& arguments);
 
 	std::string to_string() const;
 };
@@ -60,6 +62,7 @@ struct Reference {
 	Identifier argumentIdentifier;
 
 	Reference();
+	Reference(const Reference& reference,const Identifier& argumentIdentifier);
 	Reference(const Identifier& value);
 	Reference(const Identifier& value,const Identifier& argumentIdentifier);
 	Reference(const std::vector<Identifier>& values);

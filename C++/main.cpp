@@ -433,7 +433,7 @@ bool isNameList(const AST& ast) {
 	if (isName(ast)) return true;
 	if (ast.type == GROUPER && ast.op[0] == Characters::GENERAL_OPEN && ast.op[1] == Characters::GENERAL_OPEN) return isNameList(ast[0]);
 	if (ast.type != BINARY || ast.op[0] != Characters::GENERAL_DELIMITER) return false;
-	for (const AST& a : ast) if (!isName(ast)) return false;
+	for (const AST& a : ast) if (!isName(a)) return false;
 	return true;
 };
 bool isName(const AST& ast) {
@@ -449,13 +449,13 @@ bool isName(const AST& ast) {
 };
 bool isArgumentList(const AST& ast) {
 	if (ast.type != GROUPER || ast.op[0] != Characters::ARGUMENT_LIST_OPEN || ast.op[1] != Characters::ARGUMENT_LIST_CLOSE) return false;
-	if (ast.size() == 0 || isArgument(Ast[0])) return true;
+	if (ast.size() == 0 || isArgument(ast[0])) return true;
 	if (ast[0].type == GROUPER) return isArgumentList(ast[0]);
 	if (ast[0].type == BINARY && ast.op[0] == Characters::GENERAL_DELIMITER) {
 		for (const AST& a : ast) if (!isArgument(a)) return false;
 		return true;
 	};
-	return isArgument(ast[0]);
+	return false;
 };
 bool isArgument(const AST& ast) {
 	if (isNonInheritingArgument(ast)) return true;
@@ -472,7 +472,7 @@ bool isNonInheritingArgument(const AST& ast) {
 	if (isNonInstanceArgument(ast)) return true;
 	if (ast.type == BINARY && ast.size() == 2 && ast.op[0] == Characters::INSTANCE_OPERATOR) return (
 		isNonInstanceArgument(ast[0]) && (
-			isIntersection(ast[1]) ||
+			isUnion(ast[1]) ||
 			isReference(ast[1])
 		)
 	);
@@ -482,7 +482,7 @@ bool isNonInstanceArgument(const AST& ast) {
 	return (
 		ast.type == NONE && Characters::isName(ast) ||
 		ast.type == UNARY && Characters::isName(ast[0])
-	)
+	);
 };
 bool isUnion(const AST& ast) {
 	if (ast.type != BINARY || ast.op[0] != Characters::UNION_OPERATOR) return false;
@@ -493,6 +493,111 @@ bool isIntersection(const AST& ast) {
 	if (ast.type != BINARY || ast.op[0] != Characters::INTERSECTION_OPERATOR) return false;
 	for (const AST& a : ast) if (!isReference(a)) return false;
 	return true;
+};
+Reference ASTtoReference(const AST& ast) {
+	if (isIdentifier(ast)) return Reference(ASTtoIdentifier(ast));
+	if (
+		ast.type == GROUPER &&
+		ast.size() > 0 &&
+		ast.op.size() == 2 &&
+		ast.op[0] == Characters::GENERAL_OPEN &&
+		ast.op[1] == Characters::GENERAL_CLOSE
+	) return ASTtoReference(ast[0]);
+	if (ast.op[0] == Characters::REFERENCE_DELIMITER) {
+		Reference ref;
+		for (const AST& a : ast) ref.push_back(ASTtoIdentifier(a));
+		return ref;
+	};
+	return Reference(ASTtoReference(ast[0]),ASTtoIdentifier(ast[1]));
+};
+Identifier ASTtoIdentifier(const AST& ast) {
+	if (isNameList(ast))
+		return Identifier(ASTtoNameList(ast));
+	if (
+		ast.type == GROUPER &&
+		ast.size() > 0 &&
+		ast.op.size() == 2 &&
+		ast.op[0] == Characters::GENERAL_OPEN &&
+		ast.op[1] == Characters::GENERAL_CLOSE
+	) return ASTtoIdentifier(ast[0]);
+	return Identifier(
+		ASTtoNameList(ast[0]),
+		ASTtoArgumentList(ast[1])
+	);
+};
+std::vector<std::string> ASTtoNameList(const AST& ast) {
+	if (isName(ast))
+		return {ASTtoName(ast)};
+	if (ast.type == GROUPER && ast.op[0] == Characters::GENERAL_OPEN && ast.op[1] == Characters::GENERAL_OPEN)
+		return ASTtoNameList(ast[0]);
+	std::vector<std::string> values(ast.size(),"");
+	for (size_t i = 0; i < values.size(); ++i)
+		values[i] = ASTtoName(a);
+	return values;
+};
+std::string ASTtoName(const AST& ast) {
+	if (ast.type == NONE)
+		return ast.to_string();
+	return ASTtoName(ast[0]);
+};
+ArgumentList ASTtoArgumentList(const AST& ast) {
+	if (ast.size() == 0)
+		return ArgumentList();
+	if (isArgument(ast[0]))
+		return ArgumentList(ASTtoArgument(ast[0]));
+	if (ast[0].type == GROUPER)
+		return ASTtoArgumentList(ast[0]);
+	ArgumentList arguments;
+	for (const AST& a : ast)
+		arguments.push_back(ASTtoArgument(a));
+	return arguments;
+};
+Argument ASTtoArgument(const AST& ast) {
+	if (isNonInheritingArgument(ast))
+		return ASTtoNonInheritingArgument(ast);
+	if (ast.type == NONE)
+		return Argument(ast.to_string());
+	Argument argument = ASTtoNonInheritingArgument(ast[0]);
+	std::set<Reference> references;
+	if (isIntersection(ast[1]))
+		references = ASTtoIntersection(ast[1]);
+	else
+		references.insert(ASTtoReference(ast[1]));
+	return Argument(
+		argument.name,
+		argument.returns,
+		references
+	);
+};
+Argument ASTtoNonInheritingArgument(const AST& ast) {
+	if (isNonInstanceArgument(ast))
+		return ASTtoNonInstanceArgument(ast);
+	Argument argument = ASTtoNonInstanceArgument(ast[0]);
+	std::set<Reference> references;
+	if (isUnion(ast[1]))
+		references = ASTtoUnion(ast[1]);
+	else
+		references.insert(ASTtoReference(ast[1]));
+	return Argument(
+		argument.name,
+		references,
+		{}
+	);
+};
+Argument ASTtoNonInstanceArgument(const AST& ast) {
+	return Argument(ast.to_string());
+};
+std::set<Reference> ASTtoUnion(const AST& ast) {
+	std::set<Reference> values;
+	for (const AST& a : ast)
+		values.insert(ASTtoReference(a));
+	return values;
+};
+std::set<Reference> ASTtoIntersection(const AST& ast) {
+	std::set<Reference> values;
+	for (const AST& a : ast)
+		values.insert(ASTtoReference(a));
+	return values;
 };
 size_t getContainerId(const size_t id) {
 	for (const auto& [ containerId : attributeId ] : ATTRIBUTES) if (id == attributeId) return containerId;
@@ -545,15 +650,21 @@ size_t getAttributeId(const size_t containerId,const AST& ast) {
 		for (const size_t id : entityIds) {
 			size_t numargs = getNumberArguments(id);
 			if (numargs == argumentList.size())
-				argumentIds[id] = std::vector<std::string>(numargs,"");
+				argumentIds[id] = std::vector<std::string>(numargs,0);
 		};
 		entityIds.clear();
-		for (const auto& [ key , value ] : argumentIds) {
+		std::set<std::string> names;
+		for (const auto& [ key , value ] : argumentIds)
 			entityIds.push_back(key);
+		for (const size_t id : entityIds) {
+			for (size_t i = 0; i < argumentIds[id].size(); ++i) {
+				argumentIds[id][i] = getArgumentId(id,i);
+				names = getEntityNames(argumentIds[id][i]);
+			};
 		};
-		for (const size_t id : entityIds) for (size_t i = 0; i < argumentIds[id].size(); ++i) argumentIds[id][i] = getArgumentId(id,i);
-		for (const auto& [])
-
+		for (const size_t id : entityIds)
+			for (size_t i = 0; i < argumentIds[id].size(); ++i)
+				argumentIds[id][i] = getArgumentId(id,i);
 	};
 };
 size_t addEntity() {

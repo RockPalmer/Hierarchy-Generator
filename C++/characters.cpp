@@ -27,6 +27,7 @@ namespace Characters {
 	const std::string ATTRIBUTE_LIST_CLOSE = "}";
 	const std::string LIST_ARGUMENT_OPERATOR = "*";
 	const std::string DICT_ARGUMENT_OPERATOR = "**";
+	const std::string OPTIONAL_ARGUMENT_OPERATOR = "?";
 	const std::vector<std::string> BINOPS = {
 		GENERAL_DELIMITER,
 		BEQUEATH_OPERATOR,
@@ -46,7 +47,8 @@ namespace Characters {
 	};
 	const std::vector<std::string> UNOPS = {
 		LIST_ARGUMENT_OPERATOR,
-		DICT_ARGUMENT_OPERATOR
+		DICT_ARGUMENT_OPERATOR,
+		OPTIONAL_ARGUMENT_OPERATOR
 	};
 	const std::vector<std::tuple<std::string,std::string>> GROUPING_SYMBOLS = {
 		{ARGUMENT_LIST_OPEN,ARGUMENT_LIST_CLOSE},
